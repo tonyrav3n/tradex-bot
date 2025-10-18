@@ -4,12 +4,20 @@ pragma solidity ^0.8.20;
 contract TradeNestEscrow {
     address public buyer;
     address public seller;
-    uint public amount;
+    uint256 public amount;
 
-    bool public buyerFunded;
-    bool public sellerDelivered;
-    bool public buyerApproved;
-    bool public released;
+    enum TradeStatus {
+        Created,
+        Funded,
+        Delivered,
+        Completed,
+        Cancelled,
+        Disputed
+    }
+    TradeStatus public status;
+
+    uint256 public deliveryTimestamp;
+    uint256 public releaseTimeout = 1 days;
 
     // --- EVENTS ---
     event Funded(address indexed buyer, uint amount);
@@ -17,47 +25,52 @@ contract TradeNestEscrow {
     event Approved(address indexed buyer);
     event Released(address indexed to, uint amount);
 
-    constructor(address _seller) payable {
-        buyer = msg.sender;
+    constructor(address _buyer, address _seller) {
+        require(_buyer != _seller, "buyer and seller cannot be the same");
+        buyer = _buyer;
         seller = _seller;
-        require(buyer != seller, "buyer and seller cannot be the same");
+        status = TradeStatus.Created;
+    }
+
+    function fund() external payable {
+        require(msg.sender == buyer, "only buyer can fund");
+        require(status == TradeStatus.Created, "trade not at 'created' state");
+        require(msg.value > 0, "must send funds");
+
         amount = msg.value;
-        require(amount > 0, "must send funds");
-        buyerFunded = true;
+        status = TradeStatus.Funded;
+
         emit Funded(buyer, amount);
     }
 
     function markDelivered() external {
         require(msg.sender == seller, "only seller");
-        require(!released, "already released");
-        require(!sellerDelivered, "cannot redeclare delivery");
-        require(buyerFunded, "no funds yet");
-        sellerDelivered = true;
+        require(status == TradeStatus.Funded, "trade not at 'funded' state");
+
+        status = TradeStatus.Delivered;
+        deliveryTimestamp = block.timestamp;
         emit Delivered(seller);
     }
 
     function approveDelivery() external {
         require(msg.sender == buyer, "only buyer");
-        require(!released, "already released");
-        require(sellerDelivered, "not delivered");
-        buyerApproved = true;
+        require(status == TradeStatus.Delivered, "trade not at 'delivered' state");
+
+
         emit Approved(buyer);
         _release();
     }
 
+    function releaseAfterTimeout() external {
+        require(status == TradeStatus.Delivered, "trade not at 'delivered' state");
+        require(block.timestamp >= deliveryTimestamp + releaseTimeout, "timeout not reached");
+
+        _release();
+    }
+
     function _release() internal {
-        released = true;
+        status = TradeStatus.Completed;
         payable(seller).transfer(amount);
         emit Released(seller, amount);
     }
-
-    // loophole: buyer could cancel right after seller delivers
-
-    // function cancel() external {
-    //     require(!released, "already released");
-    //     require(msg.sender == buyer, "only buyer");
-    //     require(!sellerDelivered, "cannot cancel after delivery");
-    //     released = true;
-    //     payable(buyer).transfer(amount);
-    // }
 }
