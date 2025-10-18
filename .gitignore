@@ -1,0 +1,53 @@
+# Ignore build artifacts and deployment files
+/dist/
+/build/
+/out/
+/*.json
+
+# Ignore Remix IDE files
+.solcover
+.localhistory/
+.history/
+
+# Ignore compiled Solidity files
+*.dbg.json
+*.abi
+*.bin
+*.hex
+*.solc-cache.json
+
+# Ignore node_modules if using Node.js environment
+node_modules/
+
+# Ignore environment and config files
+.env
+.env.local
+.env.*.json
+
+# Ignore test coverage reports
+coverage/
+*.lcov
+
+# Ignore IDE specific files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
+
+# Ignore local contract artifacts if using Hardhat or Truffle
+artifacts/
+contracts/*.dbg.json
+contracts/*.json
+
+# Ignore other temporary files
+*.log
+*.gz
+*.zip
+
+# Added based on current directory
+.deps/
+.states/
