@@ -1,16 +1,4 @@
-import {
-  Events,
-  MessageFlags,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  UserSelectMenuBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  EmbedBuilder,
-  ChannelType,
-} from "discord.js";
+import { Events, MessageFlags, ChannelType } from "discord.js";
 import { createTrade } from "../utils/createTrade.js";
 import { startFlow, setFlow, getFlow, clearFlow } from "../utils/flowState.js";
 import {
@@ -21,8 +9,6 @@ import {
   buildCreateThreadRow,
   buildCreatedEmbed,
 } from "../utils/components.js";
-
-// Flow state is handled via utils/flowState.js
 
 export const name = Events.InteractionCreate;
 export const once = false;
