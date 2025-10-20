@@ -48,27 +48,44 @@ export function buildCounterpartySelectRow() {
 export function buildDescriptionModal() {
   const modal = new ModalBuilder()
     .setCustomId("trade_description_modal")
-    .setTitle("Trade Item Description");
+    .setTitle("Trade Details");
 
-  const input = new TextInputBuilder()
+  const desc = new TextInputBuilder()
     .setCustomId("trade_description")
     .setLabel("Describe the item")
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(true)
     .setMaxLength(500);
 
-  const row = new ActionRowBuilder().addComponents(input);
-  modal.addComponents(row);
+  const price = new TextInputBuilder()
+    .setCustomId("trade_price_usd")
+    .setLabel("Price (USD)")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  const row1 = new ActionRowBuilder().addComponents(desc);
+  const row2 = new ActionRowBuilder().addComponents(price);
+  modal.addComponents(row1, row2);
   return modal;
 }
 
-export function buildConfirmationEmbed({ buyerId, sellerId, description }) {
+export function buildConfirmationEmbed({
+  buyerId,
+  sellerId,
+  description,
+  priceUsd,
+}) {
   return new EmbedBuilder()
     .setTitle("Confirm Trade Details")
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
       { name: "Item", value: description, inline: false },
+      {
+        name: "Price (USD)",
+        value: priceUsd ? `$${priceUsd}` : "—",
+        inline: true,
+      },
     )
     .setColor(0x3498db);
 }
@@ -92,4 +109,68 @@ export function buildCreateThreadRow() {
       .setLabel("Create Private Thread")
       .setStyle(ButtonStyle.Success),
   );
+}
+
+export function buildAgreeRow({
+  buyerDisabled = false,
+  sellerDisabled = false,
+} = {}) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("agree_buyer")
+      .setLabel("Buyer Agree")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(buyerDisabled),
+    new ButtonBuilder()
+      .setCustomId("agree_seller")
+      .setLabel("Seller Agree")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(sellerDisabled),
+  );
+}
+
+export function buildProvideBuyerAddressRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("provide_buyer_address")
+      .setLabel("Provide Address")
+      .setStyle(ButtonStyle.Primary),
+  );
+}
+
+export function buildProvideSellerAddressRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("provide_seller_address")
+      .setLabel("Provide Address")
+      .setStyle(ButtonStyle.Primary),
+  );
+}
+
+export function buildBuyerAddressModal() {
+  const modal = new ModalBuilder()
+    .setCustomId("buyer_address_modal")
+    .setTitle("Buyer Address");
+  const input = new TextInputBuilder()
+    .setCustomId("buyer_address")
+    .setLabel("Your Address")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+  const row = new ActionRowBuilder().addComponents(input);
+  modal.addComponents(row);
+  return modal;
+}
+
+export function buildSellerAddressModal() {
+  const modal = new ModalBuilder()
+    .setCustomId("seller_address_modal")
+    .setTitle("Seller Address");
+  const input = new TextInputBuilder()
+    .setCustomId("seller_address")
+    .setLabel("Your Address")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+  const row = new ActionRowBuilder().addComponents(input);
+  modal.addComponents(row);
+  return modal;
 }

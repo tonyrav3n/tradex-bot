@@ -1,6 +1,16 @@
 import { Events, MessageFlags, ChannelType } from "discord.js";
 import { createTrade } from "../utils/createTrade.js";
-import { startFlow, setFlow, getFlow, clearFlow } from "../utils/flowState.js";
+import {
+  startFlow,
+  setFlow,
+  getFlow,
+  clearFlow,
+  setPrice,
+  markBuyerAgreed,
+  markSellerAgreed,
+  setBuyerAddress,
+  setSellerAddress,
+} from "../utils/flowState.js";
 import {
   buildRoleButtonsRow,
   buildCounterpartySelectRow,
@@ -8,7 +18,11 @@ import {
   buildConfirmationEmbed,
   buildCreateThreadRow,
   buildCreatedEmbed,
+  buildAgreeRow,
+  buildBuyerAddressModal,
+  buildSellerAddressModal,
 } from "../utils/components.js";
+const PAYMENT_ADDRESS = process.env.PAYMENT_ADDRESS || "";
 
 export const name = Events.InteractionCreate;
 export const once = false;
@@ -73,14 +87,24 @@ export async function execute(client, interaction) {
           components: [row],
         });
       } else if (interaction.customId === "create_thread") {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         const flow = getFlow(uid);
         if (!flow || !flow.role || !flow.counterpartyId || !flow.description) {
-          return await interaction.editReply({
+          return await interaction.update({
             content:
               "Trade details are incomplete. Please restart with Create Trade.",
+            components: [],
           });
         }
+        if (flow.threadId) {
+          return await interaction.update({
+            content: `✅ Private thread already exists: <#${flow.threadId}>`,
+            components: [],
+          });
+        }
+        await interaction.update({
+          content: "⏳ Creating private thread...",
+          components: [],
+        });
 
         const buyerId = flow.role === "buyer" ? uid : flow.counterpartyId;
         const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
@@ -108,13 +132,108 @@ export async function execute(client, interaction) {
           content: `Welcome <@${buyerId}> and <@${sellerId}>`,
           embeds: [embed],
         });
-
-        await interaction.editReply({
-          content: `✅ Private thread created: <#${thread.id}>`,
+        const agreeMsg = await thread.send({
+          content: "Please both click Agree to proceed.",
+          components: [buildAgreeRow()],
+        });
+        setFlow(uid, { threadId: thread.id, agreeMessageId: agreeMsg.id });
+        setFlow(flow.counterpartyId, {
+          threadId: thread.id,
+          agreeMessageId: agreeMsg.id,
         });
 
-        // Clear flow
-        clearFlow(uid);
+        await interaction.followUp({
+          content: `✅ Private thread created: <#${thread.id}>`,
+          flags: MessageFlags.Ephemeral,
+        });
+      } else if (interaction.customId === "agree_buyer") {
+        const uid = interaction.user.id;
+        const flow = getFlow(uid);
+        if (!flow) {
+          await interaction.reply({
+            content: "No active trade flow found.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        const buyerId = flow.role === "buyer" ? uid : flow.counterpartyId;
+        if (uid !== buyerId) {
+          await interaction.reply({
+            content: "You are not the buyer for this trade.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        if (flow.buyerAgreed) {
+          await interaction.reply({
+            content: "You already agreed.",
+            flags: MessageFlags.Ephemeral,
+          });
+        } else {
+          setFlow(uid, { buyerAgreed: true });
+          setFlow(flow.counterpartyId, { buyerAgreed: true });
+          await interaction.showModal(buildBuyerAddressModal());
+          const updated = getFlow(uid);
+          if (updated?.agreeMessageId) {
+            try {
+              const msg = await interaction.channel.messages.fetch(
+                updated.agreeMessageId,
+              );
+              await msg.edit({
+                components: [
+                  buildAgreeRow({
+                    buyerDisabled: true,
+                    sellerDisabled: !!updated.sellerAgreed,
+                  }),
+                ],
+              });
+            } catch {}
+          }
+        }
+      } else if (interaction.customId === "agree_seller") {
+        const uid = interaction.user.id;
+        const flow = getFlow(uid);
+        if (!flow) {
+          await interaction.reply({
+            content: "No active trade flow found.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
+        if (uid !== sellerId) {
+          await interaction.reply({
+            content: "You are not the seller for this trade.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        if (flow.sellerAgreed) {
+          await interaction.reply({
+            content: "You already agreed.",
+            flags: MessageFlags.Ephemeral,
+          });
+        } else {
+          setFlow(uid, { sellerAgreed: true });
+          setFlow(flow.counterpartyId, { sellerAgreed: true });
+          await interaction.showModal(buildSellerAddressModal());
+          const updated = getFlow(uid);
+          if (updated?.agreeMessageId) {
+            try {
+              const msg = await interaction.channel.messages.fetch(
+                updated.agreeMessageId,
+              );
+              await msg.edit({
+                components: [
+                  buildAgreeRow({
+                    buyerDisabled: !!updated.buyerAgreed,
+                    sellerDisabled: true,
+                  }),
+                ],
+              });
+            } catch {}
+          }
+        }
       }
     }
 
@@ -127,8 +246,10 @@ export async function execute(client, interaction) {
       const uid = interaction.user.id;
       const [counterpartyId] = interaction.values;
       setFlow(uid, { counterpartyId });
+      const initiatorFlow = getFlow(uid) || {};
+      const oppRole = initiatorFlow.role === "buyer" ? "seller" : "buyer";
+      setFlow(counterpartyId, { role: oppRole, counterpartyId: uid });
 
-      // Show description modal
       const modal = buildDescriptionModal();
       await interaction.showModal(modal);
     }
@@ -142,13 +263,24 @@ export async function execute(client, interaction) {
       const uid = interaction.user.id;
       const description =
         interaction.fields.getTextInputValue("trade_description");
+      const priceUsd = interaction.fields.getTextInputValue("trade_price_usd");
       setFlow(uid, { description });
+      setPrice(uid, priceUsd);
       const flow = getFlow(uid);
+      if (flow?.counterpartyId) {
+        setFlow(flow.counterpartyId, { description });
+        setPrice(flow.counterpartyId, priceUsd);
+      }
 
       const buyerId = flow.role === "buyer" ? uid : flow.counterpartyId;
       const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
 
-      const embed = buildConfirmationEmbed({ buyerId, sellerId, description });
+      const embed = buildConfirmationEmbed({
+        buyerId,
+        sellerId,
+        description,
+        priceUsd,
+      });
 
       const row = buildCreateThreadRow();
 
@@ -159,13 +291,95 @@ export async function execute(client, interaction) {
         components: [row],
       });
     }
+
+    if (
+      interaction.isModalSubmit &&
+      interaction.isModalSubmit() &&
+      interaction.customId === "buyer_address_modal"
+    ) {
+      const uid = interaction.user.id;
+      const addr = interaction.fields.getTextInputValue("buyer_address");
+      setBuyerAddress(uid, addr);
+      const flow = getFlow(uid);
+      if (flow?.counterpartyId) {
+        setBuyerAddress(flow.counterpartyId, addr);
+      }
+      const f = getFlow(uid);
+      if (
+        f?.buyerAgreed &&
+        f?.sellerAgreed &&
+        f?.buyerAddress &&
+        f?.sellerAddress
+      ) {
+        try {
+          const txHash = await createTrade(
+            f.buyerAddress,
+            f.sellerAddress,
+            "0.001",
+          );
+          await interaction.channel.send({
+            content: `✅ Trade created! Tx: ${txHash}`,
+          });
+        } catch (e) {
+          await interaction.channel.send({
+            content: `❌ Failed to create trade: ${e.message}`,
+          });
+        }
+      }
+      await interaction.reply({
+        content: `Buyer address registered. Please send $${f?.priceUsd ?? "N/A"} to ${PAYMENT_ADDRESS}.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    if (
+      interaction.isModalSubmit &&
+      interaction.isModalSubmit() &&
+      interaction.customId === "seller_address_modal"
+    ) {
+      const uid = interaction.user.id;
+      const addr = interaction.fields.getTextInputValue("seller_address");
+      setSellerAddress(uid, addr);
+      const flow = getFlow(uid);
+      if (flow?.counterpartyId) {
+        setSellerAddress(flow.counterpartyId, addr);
+      }
+      const f = getFlow(uid);
+      if (
+        f?.buyerAgreed &&
+        f?.sellerAgreed &&
+        f?.buyerAddress &&
+        f?.sellerAddress
+      ) {
+        try {
+          const txHash = await createTrade(
+            f.buyerAddress,
+            f.sellerAddress,
+            "0.001",
+          );
+          await interaction.channel.send({
+            content: `✅ Trade created! Tx: ${txHash}`,
+          });
+        } catch (e) {
+          await interaction.channel.send({
+            content: `❌ Failed to create trade: ${e.message}`,
+          });
+        }
+      }
+      await interaction.reply({
+        content: "Seller address registered.",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
   } catch (err) {
     console.error("Interaction error:", err);
     if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: "There was an error handling your interaction.",
-        flags: MessageFlags.Ephemeral,
-      });
+      try {
+        await interaction.reply({
+          content: "There was an error handling your interaction.",
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch {}
     }
   }
 }

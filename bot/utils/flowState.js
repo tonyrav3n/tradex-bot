@@ -14,6 +14,11 @@ export function startFlow(userId, initial = {}) {
     initiatorId: userId,
     createdAt: now,
     updatedAt: now,
+    priceUsd: null,
+    buyerAgreed: false,
+    sellerAgreed: false,
+    buyerAddress: null,
+    sellerAddress: null,
     ...initial,
   };
   flows.set(userId, flow);
@@ -49,4 +54,24 @@ export function dumpFlows() {
     userId,
     flow,
   }));
+}
+
+export function setPrice(userId, priceUsd) {
+  return setFlow(userId, { priceUsd });
+}
+
+export function markBuyerAgreed(userId) {
+  return setFlow(userId, { buyerAgreed: true });
+}
+
+export function markSellerAgreed(userId) {
+  return setFlow(userId, { sellerAgreed: true });
+}
+
+export function setBuyerAddress(userId, address) {
+  return setFlow(userId, { buyerAddress: address });
+}
+
+export function setSellerAddress(userId, address) {
+  return setFlow(userId, { sellerAddress: address });
 }

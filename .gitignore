@@ -2,7 +2,6 @@
 /dist/
 /build/
 /out/
-/*.json
 
 # Ignore Remix IDE files
 .solcover
