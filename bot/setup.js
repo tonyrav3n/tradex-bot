@@ -1,13 +1,13 @@
 // setup.js
-import { Client, GatewayIntentBits, PermissionsBitField } from 'discord.js';
-import dotenv from 'dotenv';
+import { Client, GatewayIntentBits, PermissionsBitField } from "discord.js";
+import dotenv from "dotenv";
 dotenv.config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-client.once('clientReady', async () => {
+client.once("clientReady", async () => {
   const guild = await client.guilds.fetch(process.env.GUILD_ID);
-  if (!guild) return console.log('Guild not found. Check GUILD_ID in .env');
+  if (!guild) return console.log("Guild not found. Check GUILD_ID in .env");
 
   console.log(`Setting up TradeNest server: ${guild.name}`);
   await guild.roles.fetch();
@@ -28,7 +28,7 @@ client.once('clientReady', async () => {
 
   // === 2. DELETE ALL ROLES EXCEPT BOT & @everyone ===
   for (const role of guild.roles.cache.values()) {
-    if (!role.editable || role.name === '@everyone') {
+    if (!role.editable || role.name === "@everyone") {
       console.log(`Skipping undeletable role: ${role.name}`);
       continue;
     }
@@ -42,13 +42,13 @@ client.once('clientReady', async () => {
   // === 3. CREATE ROLES ===
   const roles = {};
   const roleData = [
-    ['Founder', 0xffd700, [PermissionsBitField.Flags.Administrator]],
-    ['Admin', 0x4169e1, [PermissionsBitField.Flags.Administrator]],
-    ['Contributor', 0x00ffff, []],
-    ['Moderator', 0x9b59b6, []],
-    ['Beta Tester', 0x2ecc71, []],
-    ['Community Member', 0x95a5a6, []],
-    ['Muted', null, []],
+    ["Founder", 0xffd700, [PermissionsBitField.Flags.Administrator]],
+    ["Admin", 0x4169e1, [PermissionsBitField.Flags.Administrator]],
+    ["Contributor", 0x00ffff, []],
+    ["Moderator", 0x9b59b6, []],
+    ["Beta Tester", 0x2ecc71, []],
+    ["Community Member", 0x95a5a6, []],
+    ["Muted", null, []],
   ];
 
   for (const [name, color, perms] of roleData) {
@@ -56,7 +56,7 @@ client.once('clientReady', async () => {
       name,
       color,
       permissions: perms,
-      reason: 'TradeNest setup',
+      reason: "TradeNest setup",
     });
   }
 
@@ -64,15 +64,15 @@ client.once('clientReady', async () => {
 
   // === 4. CATEGORY + CHANNEL STRUCTURE ===
   const categories = {
-    WELCOME: [['🏠・welcome'], ['📜・rules'], ['📢・announcements']],
-    'BOT-SUPPORT': [
-      ['🤖・bot-commands'],
-      ['📘・how-to-use'],
-      ['❓・faq'],
-      ['🎟️・support'],
+    WELCOME: [["🏠・welcome"], ["📜・rules"], ["📢・announcements"]],
+    "BOT-SUPPORT": [
+      ["🤖・bot-commands"],
+      ["📘・how-to-use"],
+      ["❓・faq"],
+      ["🎟️・support"],
     ],
-    DEVELOPMENT: [['🧠・dev-updates'], ['💡・ideas-lab'], ['🐞・bugs']],
-    COMMUNITY: [['💬・general'], ['⭐・feedback']],
+    DEVELOPMENT: [["🧠・dev-updates"], ["💡・ideas-lab"], ["🐞・bugs"]],
+    COMMUNITY: [["💬・general"], ["⭐・feedback"]],
   };
 
   for (const [catName, chans] of Object.entries(categories)) {
@@ -84,26 +84,26 @@ client.once('clientReady', async () => {
         parent: category,
       });
 
-      if (catName === 'DEVELOPMENT') {
+      if (catName === "DEVELOPMENT") {
         await channel.permissionOverwrites.set([
           { id: everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
           {
-            id: roles['Founder'],
+            id: roles["Founder"],
             allow: [PermissionsBitField.Flags.ViewChannel],
           },
           {
-            id: roles['Admin'],
+            id: roles["Admin"],
             allow: [PermissionsBitField.Flags.ViewChannel],
           },
           {
-            id: roles['Contributor'],
+            id: roles["Contributor"],
             allow: [PermissionsBitField.Flags.ViewChannel],
           },
         ]);
       } else {
         await channel.permissionOverwrites.set([
           {
-            id: roles['Muted'],
+            id: roles["Muted"],
             deny: [
               PermissionsBitField.Flags.SendMessages,
               PermissionsBitField.Flags.AddReactions,
@@ -112,11 +112,11 @@ client.once('clientReady', async () => {
         ]);
       }
 
-      if (chanName.includes('announcements')) {
-        await channel.permissionOverwrites.edit(roles['Founder'], {
+      if (chanName.includes("announcements")) {
+        await channel.permissionOverwrites.edit(roles["Founder"], {
           SendMessages: true,
         });
-        await channel.permissionOverwrites.edit(roles['Admin'], {
+        await channel.permissionOverwrites.edit(roles["Admin"], {
           SendMessages: true,
         });
         await channel.permissionOverwrites.edit(everyone, {
@@ -126,7 +126,7 @@ client.once('clientReady', async () => {
     }
   }
 
-  console.log('✅ TradeNest server setup complete.');
+  console.log("✅ TradeNest server setup complete.");
   setTimeout(() => process.exit(0), 2000);
 });
 

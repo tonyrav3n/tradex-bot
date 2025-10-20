@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.28;
 
 contract TradeNestEscrow {
     address public buyer;
@@ -54,16 +54,24 @@ contract TradeNestEscrow {
 
     function approveDelivery() external {
         require(msg.sender == buyer, "only buyer");
-        require(status == TradeStatus.Delivered, "trade not at 'delivered' state");
-
+        require(
+            status == TradeStatus.Delivered,
+            "trade not at 'delivered' state"
+        );
 
         emit Approved(buyer);
         _release();
     }
 
     function releaseAfterTimeout() external {
-        require(status == TradeStatus.Delivered, "trade not at 'delivered' state");
-        require(block.timestamp >= deliveryTimestamp + releaseTimeout, "timeout not reached");
+        require(
+            status == TradeStatus.Delivered,
+            "trade not at 'delivered' state"
+        );
+        require(
+            block.timestamp >= deliveryTimestamp + releaseTimeout,
+            "timeout not reached"
+        );
 
         _release();
     }

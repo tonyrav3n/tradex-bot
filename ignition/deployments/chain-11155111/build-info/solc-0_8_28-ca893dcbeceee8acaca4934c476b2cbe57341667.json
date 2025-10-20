@@ -1,0 +1,42 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-ca893dcbeceee8acaca4934c476b2cbe57341667",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/TradeNestFactory.sol": "project/contracts/TradeNestFactory.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/TradeNestEscrow.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\ncontract TradeNestEscrow {\n    address public buyer;\n    address public seller;\n    uint256 public amount;\n\n    enum TradeStatus {\n        Created,\n        Funded,\n        Delivered,\n        Completed,\n        Cancelled,\n        Disputed\n    }\n    TradeStatus public status;\n\n    uint256 public deliveryTimestamp;\n    uint256 public releaseTimeout = 1 days;\n\n    // --- EVENTS ---\n    event Funded(address indexed buyer, uint amount);\n    event Delivered(address indexed seller);\n    event Approved(address indexed buyer);\n    event Released(address indexed to, uint amount);\n\n    constructor(address _buyer, address _seller) {\n        require(_buyer != _seller, \"buyer and seller cannot be the same\");\n        buyer = _buyer;\n        seller = _seller;\n        status = TradeStatus.Created;\n    }\n\n    function fund() external payable {\n        require(msg.sender == buyer, \"only buyer can fund\");\n        require(status == TradeStatus.Created, \"trade not at 'created' state\");\n        require(msg.value > 0, \"must send funds\");\n\n        amount = msg.value;\n        status = TradeStatus.Funded;\n\n        emit Funded(buyer, amount);\n    }\n\n    function markDelivered() external {\n        require(msg.sender == seller, \"only seller\");\n        require(status == TradeStatus.Funded, \"trade not at 'funded' state\");\n\n        status = TradeStatus.Delivered;\n        deliveryTimestamp = block.timestamp;\n        emit Delivered(seller);\n    }\n\n    function approveDelivery() external {\n        require(msg.sender == buyer, \"only buyer\");\n        require(\n            status == TradeStatus.Delivered,\n            \"trade not at 'delivered' state\"\n        );\n\n        emit Approved(buyer);\n        _release();\n    }\n\n    function releaseAfterTimeout() external {\n        require(\n            status == TradeStatus.Delivered,\n            \"trade not at 'delivered' state\"\n        );\n        require(\n            block.timestamp >= deliveryTimestamp + releaseTimeout,\n            \"timeout not reached\"\n        );\n\n        _release();\n    }\n\n    function _release() internal {\n        status = TradeStatus.Completed;\n        payable(seller).transfer(amount);\n        emit Released(seller, amount);\n    }\n}\n"
+      },
+      "project/contracts/TradeNestFactory.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\nimport \"./TradeNestEscrow.sol\";\n\ncontract TradeNestFactory {\n    // Array to store all deployed escrows\n    TradeNestEscrow[] public escrows;\n\n    // --- EVENTS ---\n    event EscrowCreated(\n        address indexed escrowAddress,\n        address indexed buyer,\n        address indexed seller\n    );\n\n    // -- CREATE ESCROW ---\n    function createEscrow(\n        address _buyer,\n        address _seller\n    ) external returns (address) {\n        require(\n            _buyer != address(0) && _seller != address(0),\n            \"invalid address\"\n        );\n        require(_buyer != _seller, \"buyer and seller cannot be same\");\n\n        TradeNestEscrow escrow = new TradeNestEscrow(_buyer, _seller);\n        escrows.push(escrow);\n\n        emit EscrowCreated(address(escrow), _buyer, _seller);\n        return address(escrow);\n    }\n\n    // --- GET FUNCTIONS ---\n    function getAllEscrows() external view returns (TradeNestEscrow[] memory) {\n        return escrows;\n    }\n\n    function getEscrow(uint256 index) external view returns (TradeNestEscrow) {\n        require(index < escrows.length, \"index out of range\");\n        return escrows[index];\n    }\n\n    function getEscrowsCount() external view returns (uint256) {\n        return escrows.length;\n    }\n}\n"
+      }
+    }
+  }
+}
