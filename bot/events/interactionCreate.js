@@ -12,8 +12,17 @@ import {
   ChannelType,
 } from "discord.js";
 import { createTrade } from "../utils/createTrade.js";
+import { startFlow, setFlow, getFlow, clearFlow } from "../utils/flowState.js";
+import {
+  buildRoleButtonsRow,
+  buildCounterpartySelectRow,
+  buildDescriptionModal,
+  buildConfirmationEmbed,
+  buildCreateThreadRow,
+  buildCreatedEmbed,
+} from "../utils/components.js";
 
-const flows = new Map();
+// Flow state is handled via utils/flowState.js
 
 export const name = Events.InteractionCreate;
 export const once = false;
@@ -56,17 +65,8 @@ export async function execute(client, interaction) {
         }
       } else if (interaction.customId === "create_trade_flow_button") {
         // Start multi-step Create Trade flow
-        flows.set(uid, { initiatorId: uid });
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId("role_buyer")
-            .setLabel("Buyer")
-            .setStyle(ButtonStyle.Primary),
-          new ButtonBuilder()
-            .setCustomId("role_seller")
-            .setLabel("Seller")
-            .setStyle(ButtonStyle.Primary),
-        );
+        startFlow(uid);
+        const row = buildRoleButtonsRow();
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         await interaction.editReply({
           content: "What is your role in this trade?",
@@ -76,16 +76,11 @@ export async function execute(client, interaction) {
         interaction.customId === "role_buyer" ||
         interaction.customId === "role_seller"
       ) {
-        const flow = flows.get(uid) || { initiatorId: uid };
-        flow.role = interaction.customId === "role_buyer" ? "buyer" : "seller";
-        flows.set(uid, flow);
+        setFlow(uid, {
+          role: interaction.customId === "role_buyer" ? "buyer" : "seller",
+        });
 
-        const select = new UserSelectMenuBuilder()
-          .setCustomId("select_counterparty")
-          .setPlaceholder("Who's the counterparty?")
-          .setMinValues(1)
-          .setMaxValues(1);
-        const row = new ActionRowBuilder().addComponents(select);
+        const row = buildCounterpartySelectRow();
         await interaction.deferUpdate();
         await interaction.editReply({
           content: "Select the counterparty:",
@@ -93,7 +88,7 @@ export async function execute(client, interaction) {
         });
       } else if (interaction.customId === "create_thread") {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        const flow = flows.get(uid);
+        const flow = getFlow(uid);
         if (!flow || !flow.role || !flow.counterpartyId || !flow.description) {
           return await interaction.editReply({
             content:
@@ -105,15 +100,11 @@ export async function execute(client, interaction) {
         const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
 
         // Build confirmation embed to seed the thread
-        const embed = new EmbedBuilder()
-          .setTitle("Trade Created")
-          .setDescription("A private thread has been created for this trade.")
-          .addFields(
-            { name: "Buyer", value: `<@${buyerId}>`, inline: true },
-            { name: "Seller", value: `<@${sellerId}>`, inline: true },
-            { name: "Item", value: flow.description, inline: false },
-          )
-          .setColor(0x2ecc71);
+        const embed = buildCreatedEmbed({
+          buyerId,
+          sellerId,
+          description: flow.description,
+        });
 
         // Create a private thread in the current channel
         const threadName = `trade-${uid.slice(-4)}-${flow.counterpartyId.slice(-4)}`;
@@ -137,7 +128,7 @@ export async function execute(client, interaction) {
         });
 
         // Clear flow
-        flows.delete(uid);
+        clearFlow(uid);
       }
     }
 
@@ -148,23 +139,11 @@ export async function execute(client, interaction) {
       interaction.customId === "select_counterparty"
     ) {
       const uid = interaction.user.id;
-      const flow = flows.get(uid) || { initiatorId: uid };
       const [counterpartyId] = interaction.values;
-      flow.counterpartyId = counterpartyId;
-      flows.set(uid, flow);
+      setFlow(uid, { counterpartyId });
 
       // Show description modal
-      const modal = new ModalBuilder()
-        .setCustomId("trade_description_modal")
-        .setTitle("Trade Item Description");
-      const input = new TextInputBuilder()
-        .setCustomId("trade_description")
-        .setLabel("Describe the item")
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true)
-        .setMaxLength(500);
-      const row = new ActionRowBuilder().addComponents(input);
-      modal.addComponents(row);
+      const modal = buildDescriptionModal();
       await interaction.showModal(modal);
     }
 
@@ -175,30 +154,17 @@ export async function execute(client, interaction) {
       interaction.customId === "trade_description_modal"
     ) {
       const uid = interaction.user.id;
-      const flow = flows.get(uid) || { initiatorId: uid };
       const description =
         interaction.fields.getTextInputValue("trade_description");
-      flow.description = description;
-      flows.set(uid, flow);
+      setFlow(uid, { description });
+      const flow = getFlow(uid);
 
       const buyerId = flow.role === "buyer" ? uid : flow.counterpartyId;
       const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
 
-      const embed = new EmbedBuilder()
-        .setTitle("Confirm Trade Details")
-        .addFields(
-          { name: "Buyer", value: `<@${buyerId}>`, inline: true },
-          { name: "Seller", value: `<@${sellerId}>`, inline: true },
-          { name: "Item", value: description, inline: false },
-        )
-        .setColor(0x3498db);
+      const embed = buildConfirmationEmbed({ buyerId, sellerId, description });
 
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("create_thread")
-          .setLabel("Create Private Thread")
-          .setStyle(ButtonStyle.Success),
-      );
+      const row = buildCreateThreadRow();
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       await interaction.editReply({
