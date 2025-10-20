@@ -31,6 +31,8 @@ const ADDRESSES_PATH = path.resolve(
 
 // Candidate artifact paths (first existing will be used if no env override)
 const CANDIDATE_ARTIFACT_PATHS = [
+  // Prefer committed runtime ABI
+  path.resolve(ROOT, "bot", "abi", "TradeNestFactory.json"),
   path.resolve(
     ROOT,
     "ignition",
@@ -105,6 +107,7 @@ function loadFactoryAbi() {
     process.env.FACTORY_ABI_PATH || process.env.FACTORY_ARTIFACT_PATH;
   if (envArtifactPath && fileExists(envArtifactPath)) {
     const artifact = readJson(envArtifactPath);
+    if (Array.isArray(artifact)) return artifact;
     if (artifact?.abi) return artifact.abi;
     throw new Error(
       `Invalid FACTORY_ABI_PATH (no abi field): ${envArtifactPath}`,
@@ -123,10 +126,11 @@ You can also set FACTORY_ABI_PATH in .env`,
   }
 
   const artifact = readJson(artifactPath);
-  if (!artifact?.abi) {
-    throw new Error(`Artifact at ${artifactPath} has no 'abi' field.`);
-  }
-  return artifact.abi;
+  if (Array.isArray(artifact)) return artifact;
+  if (artifact?.abi) return artifact.abi;
+  throw new Error(
+    `Artifact at ${artifactPath} has no 'abi' field or is invalid.`,
+  );
 }
 
 export const FACTORY_ADDRESS = loadFactoryAddress();

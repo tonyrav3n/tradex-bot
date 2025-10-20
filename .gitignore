@@ -42,6 +42,10 @@ artifacts/
 contracts/*.dbg.json
 contracts/*.json
 
+# Keep Ignition deployments in version control (override artifacts ignore under ignition/)
+!ignition/deployments/**
+
+
 # Ignore other temporary files
 *.log
 *.gz
