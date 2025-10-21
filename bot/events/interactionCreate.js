@@ -189,25 +189,7 @@ export async function execute(client, interaction) {
             flags: MessageFlags.Ephemeral,
           });
         } else {
-          setFlow(uid, { buyerAgreed: true });
-          setFlow(flow.counterpartyId, { buyerAgreed: true });
           await interaction.showModal(buildBuyerAddressModal());
-          const updated = getFlow(uid);
-          if (updated?.agreeMessageId) {
-            try {
-              const msg = await interaction.channel.messages.fetch(
-                updated.agreeMessageId,
-              );
-              await msg.edit({
-                components: [
-                  buildAgreeRow({
-                    buyerDisabled: true,
-                    sellerDisabled: !!updated.sellerAgreed,
-                  }),
-                ],
-              });
-            } catch {}
-          }
         }
       } else if (interaction.customId === "agree_seller") {
         const uid = interaction.user.id;
@@ -233,25 +215,7 @@ export async function execute(client, interaction) {
             flags: MessageFlags.Ephemeral,
           });
         } else {
-          setFlow(uid, { sellerAgreed: true });
-          setFlow(flow.counterpartyId, { sellerAgreed: true });
           await interaction.showModal(buildSellerAddressModal());
-          const updated = getFlow(uid);
-          if (updated?.agreeMessageId) {
-            try {
-              const msg = await interaction.channel.messages.fetch(
-                updated.agreeMessageId,
-              );
-              await msg.edit({
-                components: [
-                  buildAgreeRow({
-                    buyerDisabled: !!updated.buyerAgreed,
-                    sellerDisabled: true,
-                  }),
-                ],
-              });
-            } catch {}
-          }
         }
       }
     }
@@ -359,6 +323,29 @@ export async function execute(client, interaction) {
       const flow = getFlow(uid);
       if (flow?.counterpartyId) {
         setBuyerAddress(flow.counterpartyId, addr);
+      }
+      // Mark buyer agreed on modal submit and update the agree row
+      setFlow(uid, { buyerAgreed: true });
+      if (flow?.counterpartyId) {
+        setFlow(flow.counterpartyId, { buyerAgreed: true });
+      }
+      {
+        const updated = getFlow(uid);
+        if (updated?.agreeMessageId) {
+          try {
+            const msg = await interaction.channel.messages.fetch(
+              updated.agreeMessageId,
+            );
+            await msg.edit({
+              components: [
+                buildAgreeRow({
+                  buyerDisabled: true,
+                  sellerDisabled: !!updated.sellerAgreed,
+                }),
+              ],
+            });
+          } catch {}
+        }
       }
       const f = getFlow(uid);
       if (
@@ -588,6 +575,29 @@ export async function execute(client, interaction) {
       const flow = getFlow(uid);
       if (flow?.counterpartyId) {
         setSellerAddress(flow.counterpartyId, addr);
+      }
+      // Mark seller agreed on modal submit and update the agree row
+      setFlow(uid, { sellerAgreed: true });
+      if (flow?.counterpartyId) {
+        setFlow(flow.counterpartyId, { sellerAgreed: true });
+      }
+      {
+        const updated = getFlow(uid);
+        if (updated?.agreeMessageId) {
+          try {
+            const msg = await interaction.channel.messages.fetch(
+              updated.agreeMessageId,
+            );
+            await msg.edit({
+              components: [
+                buildAgreeRow({
+                  buyerDisabled: !!updated.buyerAgreed,
+                  sellerDisabled: true,
+                }),
+              ],
+            });
+          } catch {}
+        }
       }
       const f = getFlow(uid);
       if (
