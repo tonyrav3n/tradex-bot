@@ -22,6 +22,7 @@ import {
   buildBuyerAddressModal,
   buildSellerAddressModal,
 } from "../utils/components.js";
+import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 const PAYMENT_ADDRESS = process.env.PAYMENT_ADDRESS || "";
 
 export const name = Events.InteractionCreate;
@@ -66,6 +67,7 @@ export async function execute(client, interaction) {
       } else if (interaction.customId === "create_trade_flow_button") {
         // Start multi-step Create Trade flow
         startFlow(uid);
+        setFlow(uid, { originalInteractionToken: interaction.token });
         const row = buildRoleButtonsRow();
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         await interaction.editReply({
@@ -78,6 +80,8 @@ export async function execute(client, interaction) {
       ) {
         setFlow(uid, {
           role: interaction.customId === "role_buyer" ? "buyer" : "seller",
+          originalInteractionToken:
+            getFlow(uid)?.originalInteractionToken || interaction.token,
         });
 
         const row = buildCounterpartySelectRow();
@@ -142,10 +146,19 @@ export async function execute(client, interaction) {
           agreeMessageId: agreeMsg.id,
         });
 
-        await interaction.followUp({
-          content: `✅ Private thread created: <#${thread.id}>`,
-          flags: MessageFlags.Ephemeral,
-        });
+        const originalToken = flow?.originalInteractionToken;
+        const appId = client?.application?.id;
+        if (originalToken && appId) {
+          await updateEphemeralOriginal(appId, originalToken, {
+            content: `✅ Private thread created: <#${thread.id}>`,
+            components: [],
+          });
+        } else {
+          await interaction.editReply({
+            content: `✅ Private thread created: <#${thread.id}>`,
+            components: [],
+          });
+        }
       } else if (interaction.customId === "agree_buyer") {
         const uid = interaction.user.id;
         const flow = getFlow(uid);
@@ -153,6 +166,7 @@ export async function execute(client, interaction) {
           await interaction.reply({
             content: "No active trade flow found.",
             flags: MessageFlags.Ephemeral,
+            components: [],
           });
           return;
         }
@@ -245,7 +259,11 @@ export async function execute(client, interaction) {
     ) {
       const uid = interaction.user.id;
       const [counterpartyId] = interaction.values;
-      setFlow(uid, { counterpartyId });
+      setFlow(uid, {
+        counterpartyId,
+        originalInteractionToken:
+          getFlow(uid)?.originalInteractionToken || interaction.token,
+      });
       const initiatorFlow = getFlow(uid) || {};
       const oppRole = initiatorFlow.role === "buyer" ? "seller" : "buyer";
       setFlow(counterpartyId, { role: oppRole, counterpartyId: uid });
@@ -264,7 +282,11 @@ export async function execute(client, interaction) {
       const description =
         interaction.fields.getTextInputValue("trade_description");
       const priceUsd = interaction.fields.getTextInputValue("trade_price_usd");
-      setFlow(uid, { description });
+      setFlow(uid, {
+        description,
+        originalInteractionToken:
+          getFlow(uid)?.originalInteractionToken || interaction.token,
+      });
       setPrice(uid, priceUsd);
       const flow = getFlow(uid);
       if (flow?.counterpartyId) {
@@ -284,12 +306,40 @@ export async function execute(client, interaction) {
 
       const row = buildCreateThreadRow();
 
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      await interaction.editReply({
-        content: "Review the details and proceed to invite the counterparty.",
-        embeds: [embed],
-        components: [row],
-      });
+      const originalToken = flow?.originalInteractionToken;
+      const appId = client?.application?.id;
+      if (originalToken && appId) {
+        await updateEphemeralOriginal(appId, originalToken, {
+          content: "Review the details and proceed to invite the counterparty.",
+          embeds: [embed],
+          components: [row],
+        });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deleteReply();
+      } else {
+        if (flow?.originalInteractionToken && client?.application?.id) {
+          await updateEphemeralOriginal(
+            client.application.id,
+            flow.originalInteractionToken,
+            {
+              content:
+                "Review the details and proceed to invite the counterparty.",
+              embeds: [embed],
+              components: [row],
+            },
+          );
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+          await interaction.deleteReply();
+        } else {
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+          await interaction.editReply({
+            content:
+              "Review the details and proceed to invite the counterparty.",
+            embeds: [embed],
+            components: [row],
+          });
+        }
+      }
     }
 
     if (
