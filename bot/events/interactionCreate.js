@@ -23,7 +23,10 @@ import {
   buildSellerAddressModal,
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
-const PAYMENT_ADDRESS = process.env.PAYMENT_ADDRESS || "";
+import { publicClient } from "../utils/client.js";
+import { FACTORY_ABI } from "../utils/contract.js";
+import { decodeEventLog } from "viem";
+const BOT_ADDRESS = process.env.BOT_ADDRESS || "";
 
 export const name = Events.InteractionCreate;
 export const once = false;
@@ -367,8 +370,33 @@ export async function execute(client, interaction) {
             f.sellerAddress,
             "0.001",
           );
+          // Wait for receipt and extract escrow address from EscrowCreated event
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash: txHash,
+          });
+          let escrowAddress = null;
+          for (const log of receipt.logs) {
+            try {
+              const decoded = decodeEventLog({
+                abi: FACTORY_ABI,
+                data: log.data,
+                topics: log.topics,
+              });
+              if (decoded?.eventName === "EscrowCreated") {
+                escrowAddress = decoded.args.escrowAddress;
+                break;
+              }
+            } catch {}
+          }
+          if (escrowAddress) {
+            setFlow(uid, { escrowAddress });
+            const flow2 = getFlow(uid);
+            if (flow2?.counterpartyId) {
+              setFlow(flow2.counterpartyId, { escrowAddress });
+            }
+          }
           await interaction.channel.send({
-            content: `✅ Trade created! Tx: ${txHash}`,
+            content: `✅ Trade created! Tx: ${txHash}${escrowAddress ? ` | Escrow: ${escrowAddress}` : ""}`,
           });
         } catch (e) {
           await interaction.channel.send({
@@ -377,7 +405,9 @@ export async function execute(client, interaction) {
         }
       }
       await interaction.reply({
-        content: `Buyer address registered. Please send $${f?.priceUsd ?? "N/A"} to ${PAYMENT_ADDRESS}.`,
+        content: getFlow(uid)?.escrowAddress
+          ? `Buyer address registered. Please send $${f?.priceUsd ?? "N/A"} to ${getFlow(uid).escrowAddress}.`
+          : "Buyer address registered.",
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -407,8 +437,33 @@ export async function execute(client, interaction) {
             f.sellerAddress,
             "0.001",
           );
+          // Wait for receipt and extract escrow address from EscrowCreated event
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash: txHash,
+          });
+          let escrowAddress = null;
+          for (const log of receipt.logs) {
+            try {
+              const decoded = decodeEventLog({
+                abi: FACTORY_ABI,
+                data: log.data,
+                topics: log.topics,
+              });
+              if (decoded?.eventName === "EscrowCreated") {
+                escrowAddress = decoded.args.escrowAddress;
+                break;
+              }
+            } catch {}
+          }
+          if (escrowAddress) {
+            setFlow(uid, { escrowAddress });
+            const flow2 = getFlow(uid);
+            if (flow2?.counterpartyId) {
+              setFlow(flow2.counterpartyId, { escrowAddress });
+            }
+          }
           await interaction.channel.send({
-            content: `✅ Trade created! Tx: ${txHash}`,
+            content: `✅ Trade created! Tx: ${txHash}${escrowAddress ? ` | Escrow: ${escrowAddress}` : ""}`,
           });
         } catch (e) {
           await interaction.channel.send({
@@ -417,7 +472,9 @@ export async function execute(client, interaction) {
         }
       }
       await interaction.reply({
-        content: "Seller address registered.",
+        content: getFlow(uid)?.escrowAddress
+          ? `Seller address registered. Escrow: ${getFlow(uid).escrowAddress}.`
+          : "Seller address registered.",
         flags: MessageFlags.Ephemeral,
       });
     }

@@ -4,17 +4,20 @@ pragma solidity ^0.8.28;
 import "./TradeNestEscrow.sol";
 
 contract TradeNestFactory {
-    // Array to store all deployed escrows
     TradeNestEscrow[] public escrows;
+    address public bot; // the bot address controlling all escrows
 
-    // --- EVENTS ---
     event EscrowCreated(
         address indexed escrowAddress,
         address indexed buyer,
         address indexed seller
     );
 
-    // -- CREATE ESCROW ---
+    constructor(address _bot) {
+        require(_bot != address(0), "invalid bot address");
+        bot = _bot;
+    }
+
     function createEscrow(
         address _buyer,
         address _seller
@@ -25,14 +28,14 @@ contract TradeNestFactory {
         );
         require(_buyer != _seller, "buyer and seller cannot be same");
 
-        TradeNestEscrow escrow = new TradeNestEscrow(_buyer, _seller);
+        // Pass bot address into escrow
+        TradeNestEscrow escrow = new TradeNestEscrow(_buyer, _seller, bot);
         escrows.push(escrow);
 
         emit EscrowCreated(address(escrow), _buyer, _seller);
         return address(escrow);
     }
 
-    // --- GET FUNCTIONS ---
     function getAllEscrows() external view returns (TradeNestEscrow[] memory) {
         return escrows;
     }

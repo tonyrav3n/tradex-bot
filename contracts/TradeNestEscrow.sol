@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 contract TradeNestEscrow {
     address public buyer;
     address public seller;
+    address public bot; // bot address that controls status updates
     uint256 public amount;
 
     enum TradeStatus {
@@ -25,10 +26,16 @@ contract TradeNestEscrow {
     event Approved(address indexed buyer);
     event Released(address indexed to, uint amount);
 
-    constructor(address _buyer, address _seller) {
+    modifier onlyBot() {
+        require(msg.sender == bot, "only bot can call this");
+        _;
+    }
+
+    constructor(address _buyer, address _seller, address _bot) {
         require(_buyer != _seller, "buyer and seller cannot be the same");
         buyer = _buyer;
         seller = _seller;
+        bot = _bot;
         status = TradeStatus.Created;
     }
 
@@ -43,8 +50,8 @@ contract TradeNestEscrow {
         emit Funded(buyer, amount);
     }
 
-    function markDelivered() external {
-        require(msg.sender == seller, "only seller");
+    // All role actions now go through the bot
+    function markDelivered() external onlyBot {
         require(status == TradeStatus.Funded, "trade not at 'funded' state");
 
         status = TradeStatus.Delivered;
@@ -52,22 +59,15 @@ contract TradeNestEscrow {
         emit Delivered(seller);
     }
 
-    function approveDelivery() external {
-        require(msg.sender == buyer, "only buyer");
-        require(
-            status == TradeStatus.Delivered,
-            "trade not at 'delivered' state"
-        );
+    function approveDelivery() external onlyBot {
+        require(status == TradeStatus.Delivered, "trade not at 'delivered' state");
 
         emit Approved(buyer);
         _release();
     }
 
-    function releaseAfterTimeout() external {
-        require(
-            status == TradeStatus.Delivered,
-            "trade not at 'delivered' state"
-        );
+    function releaseAfterTimeout() external onlyBot {
+        require(status == TradeStatus.Delivered, "trade not at 'delivered' state");
         require(
             block.timestamp >= deliveryTimestamp + releaseTimeout,
             "timeout not reached"

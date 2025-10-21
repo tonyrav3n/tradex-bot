@@ -1,4 +1,4 @@
-import { createWalletClient, http } from "viem";
+import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import dotenv from "dotenv";
@@ -21,6 +21,11 @@ export const account = privateKeyToAccount(SEPOLIA_PRIVATE_KEY);
 
 export const walletClient = createWalletClient({
   account,
+  chain: sepolia,
+  transport: http(RPC_URL),
+});
+
+export const publicClient = createPublicClient({
   chain: sepolia,
   transport: http(RPC_URL),
 });

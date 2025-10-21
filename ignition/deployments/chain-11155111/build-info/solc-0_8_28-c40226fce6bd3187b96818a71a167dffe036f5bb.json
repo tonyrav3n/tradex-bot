@@ -1,0 +1,42 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-c40226fce6bd3187b96818a71a167dffe036f5bb",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/TradeNestFactory.sol": "project/contracts/TradeNestFactory.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/TradeNestEscrow.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\ncontract TradeNestEscrow {\n    address public buyer;\n    address public seller;\n    address public bot; // bot address that controls status updates\n    uint256 public amount;\n\n    enum TradeStatus {\n        Created,\n        Funded,\n        Delivered,\n        Completed,\n        Cancelled,\n        Disputed\n    }\n    TradeStatus public status;\n\n    uint256 public deliveryTimestamp;\n    uint256 public releaseTimeout = 1 days;\n\n    // --- EVENTS ---\n    event Funded(address indexed buyer, uint amount);\n    event Delivered(address indexed seller);\n    event Approved(address indexed buyer);\n    event Released(address indexed to, uint amount);\n\n    modifier onlyBot() {\n        require(msg.sender == bot, \"only bot can call this\");\n        _;\n    }\n\n    constructor(address _buyer, address _seller, address _bot) {\n        require(_buyer != _seller, \"buyer and seller cannot be the same\");\n        buyer = _buyer;\n        seller = _seller;\n        bot = _bot;\n        status = TradeStatus.Created;\n    }\n\n    function fund() external payable {\n        require(msg.sender == buyer, \"only buyer can fund\");\n        require(status == TradeStatus.Created, \"trade not at 'created' state\");\n        require(msg.value > 0, \"must send funds\");\n\n        amount = msg.value;\n        status = TradeStatus.Funded;\n\n        emit Funded(buyer, amount);\n    }\n\n    // All role actions now go through the bot\n    function markDelivered() external onlyBot {\n        require(status == TradeStatus.Funded, \"trade not at 'funded' state\");\n\n        status = TradeStatus.Delivered;\n        deliveryTimestamp = block.timestamp;\n        emit Delivered(seller);\n    }\n\n    function approveDelivery() external onlyBot {\n        require(status == TradeStatus.Delivered, \"trade not at 'delivered' state\");\n\n        emit Approved(buyer);\n        _release();\n    }\n\n    function releaseAfterTimeout() external onlyBot {\n        require(status == TradeStatus.Delivered, \"trade not at 'delivered' state\");\n        require(\n            block.timestamp >= deliveryTimestamp + releaseTimeout,\n            \"timeout not reached\"\n        );\n\n        _release();\n    }\n\n    function _release() internal {\n        status = TradeStatus.Completed;\n        payable(seller).transfer(amount);\n        emit Released(seller, amount);\n    }\n}\n"
+      },
+      "project/contracts/TradeNestFactory.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\nimport \"./TradeNestEscrow.sol\";\n\ncontract TradeNestFactory {\n    TradeNestEscrow[] public escrows;\n    address public bot; // the bot address controlling all escrows\n\n    event EscrowCreated(\n        address indexed escrowAddress,\n        address indexed buyer,\n        address indexed seller\n    );\n\n    constructor(address _bot) {\n        require(_bot != address(0), \"invalid bot address\");\n        bot = _bot;\n    }\n\n    function createEscrow(\n        address _buyer,\n        address _seller\n    ) external returns (address) {\n        require(\n            _buyer != address(0) && _seller != address(0),\n            \"invalid address\"\n        );\n        require(_buyer != _seller, \"buyer and seller cannot be same\");\n\n        // Pass bot address into escrow\n        TradeNestEscrow escrow = new TradeNestEscrow(_buyer, _seller, bot);\n        escrows.push(escrow);\n\n        emit EscrowCreated(address(escrow), _buyer, _seller);\n        return address(escrow);\n    }\n\n    function getAllEscrows() external view returns (TradeNestEscrow[] memory) {\n        return escrows;\n    }\n\n    function getEscrow(uint256 index) external view returns (TradeNestEscrow) {\n        require(index < escrows.length, \"index out of range\");\n        return escrows[index];\n    }\n\n    function getEscrowsCount() external view returns (uint256) {\n        return escrows.length;\n    }\n}\n"
+      }
+    }
+  }
+}
