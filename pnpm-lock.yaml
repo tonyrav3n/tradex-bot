@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
       viem:
         specifier: ^2.38.3
         version: 2.38.3
@@ -48,6 +51,10 @@ packages:
         optional: true
       zod:
         optional: true
+
+  dotenv@17.2.3:
+    resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
+    engines: {node: '>=12'}
 
   eventemitter3@5.0.1:
     resolution: {integrity: sha512-GWkBvjiSZK87ELrYOSESUYeVIc9mvLLf/nXalMOS5dYrgZq9o5OVkbZAVM06CVxYsCwH9BDZFPlQTlPA1j4ahA==}
@@ -111,6 +118,8 @@ snapshots:
       '@scure/base': 1.2.6
 
   abitype@1.1.0: {}
+
+  dotenv@17.2.3: {}
 
   eventemitter3@5.0.1: {}
 
