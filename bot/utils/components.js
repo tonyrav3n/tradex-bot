@@ -76,7 +76,9 @@ export function buildConfirmationEmbed({
   priceUsd,
 }) {
   return new EmbedBuilder()
-    .setTitle("Confirm Trade Details")
+    .setTitle("💼 Confirm Trade Details")
+    .setDescription(
+      `Please review the details below before proceeding:\n\n`)
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
@@ -87,13 +89,14 @@ export function buildConfirmationEmbed({
         inline: true,
       },
     )
-    .setColor(0x3498db);
+    .setColor("#00B686");
 }
 
 export function buildCreatedEmbed({ buyerId, sellerId, description }) {
   return new EmbedBuilder()
     .setTitle("Trade Created")
     .setDescription("A private thread has been created for this trade.")
+.setFooter({ text: "Confirm to continue securely." });
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
@@ -106,7 +109,7 @@ export function buildCreateThreadRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("create_thread")
-      .setLabel("Create Private Thread")
+      .setLabel("✅ Confirm")
       .setStyle(ButtonStyle.Success),
   );
 }
