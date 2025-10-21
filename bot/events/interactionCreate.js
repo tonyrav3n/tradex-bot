@@ -27,6 +27,7 @@ import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { publicClient } from "../utils/client.js";
 import { FACTORY_ABI } from "../utils/contract.js";
 import { decodeEventLog } from "viem";
+import { deriveEscrowAddressFromTx } from "../utils/deriveEscrowAddress.js";
 import { getEscrowState, watchEscrowFunded } from "../utils/escrow.js";
 import { initEscrowStatusAndWatcher } from "../utils/escrowStatus.js";
 const BOT_ADDRESS = process.env.BOT_ADDRESS || "";
@@ -367,20 +368,8 @@ export async function execute(client, interaction) {
           const receipt = await publicClient.waitForTransactionReceipt({
             hash: txHash,
           });
-          let escrowAddress = null;
-          for (const log of receipt.logs) {
-            try {
-              const decoded = decodeEventLog({
-                abi: FACTORY_ABI,
-                data: log.data,
-                topics: log.topics,
-              });
-              if (decoded?.eventName === "EscrowCreated") {
-                escrowAddress = decoded.args.escrowAddress;
-                break;
-              }
-            } catch {}
-          }
+          const escrowAddress = await deriveEscrowAddressFromTx(txHash);
+
           if (escrowAddress) {
             setFlow(uid, { escrowAddress });
             const flow2 = getFlow(uid);
@@ -619,20 +608,8 @@ export async function execute(client, interaction) {
           const receipt = await publicClient.waitForTransactionReceipt({
             hash: txHash,
           });
-          let escrowAddress = null;
-          for (const log of receipt.logs) {
-            try {
-              const decoded = decodeEventLog({
-                abi: FACTORY_ABI,
-                data: log.data,
-                topics: log.topics,
-              });
-              if (decoded?.eventName === "EscrowCreated") {
-                escrowAddress = decoded.args.escrowAddress;
-                break;
-              }
-            } catch {}
-          }
+          const escrowAddress = await deriveEscrowAddressFromTx(txHash);
+
           if (escrowAddress) {
             setFlow(uid, { escrowAddress });
             const flow2 = getFlow(uid);
