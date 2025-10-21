@@ -18,7 +18,7 @@ export function buildTradeButtonsRow() {
     new ButtonBuilder()
       .setCustomId("create_trade_flow_button")
       .setLabel("Create Trade")
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Success)
   );
 }
 
@@ -31,7 +31,7 @@ export function buildRoleButtonsRow() {
     new ButtonBuilder()
       .setCustomId("role_seller")
       .setLabel("Seller")
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(ButtonStyle.Primary)
   );
 }
 
@@ -69,25 +69,15 @@ export function buildDescriptionModal() {
   return modal;
 }
 
-export function buildConfirmationEmbed({
-  buyerId,
-  sellerId,
-  description,
-  priceUsd,
-}) {
+export function buildConfirmationEmbed({ buyerId, sellerId, description, priceUsd }) {
   return new EmbedBuilder()
     .setTitle("💼 Confirm Trade Details")
-    .setDescription(
-      `Please review the details below before proceeding:\n\n`)
+    .setDescription(`Please review the details below before proceeding:\n\n`)
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
       { name: "Item", value: description, inline: false },
-      {
-        name: "Price (USD)",
-        value: priceUsd ? `$${priceUsd}` : "—",
-        inline: true,
-      },
+      { name: "Price (USD)", value: priceUsd ? `$${priceUsd}` : "—", inline: true }
     )
     .setColor("#00B686");
 }
@@ -96,13 +86,13 @@ export function buildCreatedEmbed({ buyerId, sellerId, description }) {
   return new EmbedBuilder()
     .setTitle("Trade Created")
     .setDescription("A private thread has been created for this trade.")
-.setFooter({ text: "Confirm to continue securely." });
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
-      { name: "Item", value: description, inline: false },
+      { name: "Item", value: description, inline: false }
     )
-    .setColor(0x2ecc71);
+    .setFooter({ text: "Built for trustless digital trading." })
+    .setColor("#2ecc71");
 }
 
 export function buildCreateThreadRow() {
@@ -110,14 +100,11 @@ export function buildCreateThreadRow() {
     new ButtonBuilder()
       .setCustomId("create_thread")
       .setLabel("✅ Confirm")
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Success)
   );
 }
 
-export function buildAgreeRow({
-  buyerDisabled = false,
-  sellerDisabled = false,
-} = {}) {
+export function buildAgreeRow({ buyerDisabled = false, sellerDisabled = false } = {}) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("agree_buyer")
@@ -128,7 +115,7 @@ export function buildAgreeRow({
       .setCustomId("agree_seller")
       .setLabel("Seller Agree")
       .setStyle(ButtonStyle.Success)
-      .setDisabled(sellerDisabled),
+      .setDisabled(sellerDisabled)
   );
 }
 
@@ -137,7 +124,7 @@ export function buildProvideBuyerAddressRow() {
     new ButtonBuilder()
       .setCustomId("provide_buyer_address")
       .setLabel("Provide Address")
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(ButtonStyle.Primary)
   );
 }
 
@@ -146,7 +133,7 @@ export function buildProvideSellerAddressRow() {
     new ButtonBuilder()
       .setCustomId("provide_seller_address")
       .setLabel("Provide Address")
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(ButtonStyle.Primary)
   );
 }
 
