@@ -18,7 +18,7 @@ export function buildTradeButtonsRow() {
     new ButtonBuilder()
       .setCustomId("create_trade_flow_button")
       .setLabel("Create Trade")
-      .setStyle(ButtonStyle.Success)
+      .setStyle(ButtonStyle.Success),
   );
 }
 
@@ -31,7 +31,7 @@ export function buildRoleButtonsRow() {
     new ButtonBuilder()
       .setCustomId("role_seller")
       .setLabel("Seller")
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
   );
 }
 
@@ -69,7 +69,12 @@ export function buildDescriptionModal() {
   return modal;
 }
 
-export function buildConfirmationEmbed({ buyerId, sellerId, description, priceUsd }) {
+export function buildConfirmationEmbed({
+  buyerId,
+  sellerId,
+  description,
+  priceUsd,
+}) {
   return new EmbedBuilder()
     .setTitle("💼 Confirm Trade Details")
     .setDescription("Please review the details below before proceeding:\n\n")
@@ -77,7 +82,11 @@ export function buildConfirmationEmbed({ buyerId, sellerId, description, priceUs
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
       { name: "Item", value: description, inline: false },
-      { name: "Price (USD)", value: priceUsd ? `$${priceUsd}` : "—", inline: true }
+      {
+        name: "Price (USD)",
+        value: priceUsd ? `$${priceUsd}` : "—",
+        inline: true,
+      },
     )
     .setColor("#00B686");
 }
@@ -89,7 +98,7 @@ export function buildCreatedEmbed({ buyerId, sellerId, description }) {
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
-      { name: "Item", value: description, inline: false }
+      { name: "Item", value: description, inline: false },
     )
     .setFooter({ text: "Confirm to continue securely." })
     .setColor(0x2ecc71);
@@ -100,11 +109,14 @@ export function buildCreateThreadRow() {
     new ButtonBuilder()
       .setCustomId("create_thread")
       .setLabel("✅ Confirm")
-      .setStyle(ButtonStyle.Success)
+      .setStyle(ButtonStyle.Success),
   );
 }
 
-export function buildAgreeRow({ buyerDisabled = false, sellerDisabled = false } = {}) {
+export function buildAgreeRow({
+  buyerDisabled = false,
+  sellerDisabled = false,
+} = {}) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("agree_buyer")
@@ -115,7 +127,7 @@ export function buildAgreeRow({ buyerDisabled = false, sellerDisabled = false } 
       .setCustomId("agree_seller")
       .setLabel("Seller Agree")
       .setStyle(ButtonStyle.Success)
-      .setDisabled(sellerDisabled)
+      .setDisabled(sellerDisabled),
   );
 }
 
@@ -124,7 +136,7 @@ export function buildProvideBuyerAddressRow() {
     new ButtonBuilder()
       .setCustomId("provide_buyer_address")
       .setLabel("Provide Address")
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
   );
 }
 
@@ -133,7 +145,7 @@ export function buildProvideSellerAddressRow() {
     new ButtonBuilder()
       .setCustomId("provide_seller_address")
       .setLabel("Provide Address")
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
   );
 }
 
@@ -163,4 +175,41 @@ export function buildSellerAddressModal() {
   const row = new ActionRowBuilder().addComponents(input);
   modal.addComponents(row);
   return modal;
+}
+
+export function buildEscrowStatusEmbed({
+  escrowAddress,
+  buyerId,
+  sellerId,
+  statusText = "Created",
+  amountEth = "0",
+  color = 0x95a5a6,
+  title = "Escrow Status",
+  description,
+} = {}) {
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(description ?? "Current escrow status and details.")
+    .addFields(
+      { name: "Status", value: statusText, inline: true },
+      {
+        name: "Amount",
+        value: amountEth ? `${amountEth} ETH` : "—",
+        inline: true,
+      },
+      {
+        name: "Escrow",
+        value: escrowAddress ? `\`${escrowAddress}\`` : "—",
+        inline: false,
+      },
+      { name: "Buyer", value: buyerId ? `<@${buyerId}>` : "—", inline: true },
+      {
+        name: "Seller",
+        value: sellerId ? `<@${sellerId}>` : "—",
+        inline: true,
+      },
+    )
+    .setColor(color);
+
+  return embed;
 }

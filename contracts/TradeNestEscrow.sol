@@ -39,7 +39,7 @@ contract TradeNestEscrow {
         status = TradeStatus.Created;
     }
 
-    function fund() external payable {
+    function fund() public payable {
         require(msg.sender == buyer, "only buyer can fund");
         require(status == TradeStatus.Created, "trade not at 'created' state");
         require(msg.value > 0, "must send funds");
@@ -48,6 +48,10 @@ contract TradeNestEscrow {
         status = TradeStatus.Funded;
 
         emit Funded(buyer, amount);
+    }
+
+    receive() external payable {
+        fund();
     }
 
     // All role actions now go through the bot
@@ -60,14 +64,20 @@ contract TradeNestEscrow {
     }
 
     function approveDelivery() external onlyBot {
-        require(status == TradeStatus.Delivered, "trade not at 'delivered' state");
+        require(
+            status == TradeStatus.Delivered,
+            "trade not at 'delivered' state"
+        );
 
         emit Approved(buyer);
         _release();
     }
 
     function releaseAfterTimeout() external onlyBot {
-        require(status == TradeStatus.Delivered, "trade not at 'delivered' state");
+        require(
+            status == TradeStatus.Delivered,
+            "trade not at 'delivered' state"
+        );
         require(
             block.timestamp >= deliveryTimestamp + releaseTimeout,
             "timeout not reached"

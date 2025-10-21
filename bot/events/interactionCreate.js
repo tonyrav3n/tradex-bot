@@ -21,11 +21,13 @@ import {
   buildAgreeRow,
   buildBuyerAddressModal,
   buildSellerAddressModal,
+  buildEscrowStatusEmbed,
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { publicClient } from "../utils/client.js";
 import { FACTORY_ABI } from "../utils/contract.js";
 import { decodeEventLog } from "viem";
+import { getEscrowState, watchEscrowFunded } from "../utils/escrow.js";
 const BOT_ADDRESS = process.env.BOT_ADDRESS || "";
 
 export const name = Events.InteractionCreate;
@@ -351,6 +353,7 @@ export async function execute(client, interaction) {
       interaction.customId === "buyer_address_modal"
     ) {
       const uid = interaction.user.id;
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const addr = interaction.fields.getTextInputValue("buyer_address");
       setBuyerAddress(uid, addr);
       const flow = getFlow(uid);
@@ -398,17 +401,178 @@ export async function execute(client, interaction) {
           await interaction.channel.send({
             content: `✅ Trade created! Tx: ${txHash}${escrowAddress ? ` | Escrow: ${escrowAddress}` : ""}`,
           });
+          // Post an escrow status embed and watch for funding to update it
+          if (escrowAddress) {
+            try {
+              const flowNow = getFlow(uid);
+              const buyerId2 =
+                flowNow.role === "buyer" ? uid : flowNow.counterpartyId;
+              const sellerId2 =
+                flowNow.role === "seller" ? uid : flowNow.counterpartyId;
+
+              // If an embed was not sent yet, create it
+              if (!flowNow?.escrowStatusMessageId) {
+                const state = await getEscrowState(escrowAddress);
+                const statusEmbed = buildEscrowStatusEmbed({
+                  escrowAddress,
+                  buyerId: buyerId2,
+                  sellerId: sellerId2,
+                  statusText: state.statusText,
+                  amountEth: state.amountEth,
+                  color: state.color,
+                  title: "Escrow Status",
+                  description:
+                    "This will update automatically when the buyer funds the escrow.",
+                });
+                const statusMsg = await interaction.channel.send({
+                  embeds: [statusEmbed],
+                });
+                setFlow(uid, { escrowStatusMessageId: statusMsg.id });
+                if (flowNow?.counterpartyId) {
+                  setFlow(flowNow.counterpartyId, {
+                    escrowStatusMessageId: statusMsg.id,
+                  });
+                }
+              }
+
+              // Start a watcher once per trade to update the embed on Funded
+              if (!flowNow?.escrowWatcherStarted) {
+                setFlow(uid, { escrowWatcherStarted: true });
+                if (flowNow?.counterpartyId) {
+                  setFlow(flowNow.counterpartyId, {
+                    escrowWatcherStarted: true,
+                  });
+                }
+
+                watchEscrowFunded(
+                  escrowAddress,
+                  async () => {
+                    try {
+                      const updated = await getEscrowState(escrowAddress);
+                      const embed2 = buildEscrowStatusEmbed({
+                        escrowAddress,
+                        buyerId: buyerId2,
+                        sellerId: sellerId2,
+                        statusText: updated.statusText,
+                        amountEth: updated.amountEth,
+                        color: updated.color,
+                        title: "Escrow Status",
+                        description: "Escrow status has been updated.",
+                      });
+                      const msgId = getFlow(uid)?.escrowStatusMessageId;
+                      if (msgId) {
+                        const msg =
+                          await interaction.channel.messages.fetch(msgId);
+                        await msg.edit({ embeds: [embed2] });
+                      }
+                    } catch (e) {
+                      console.error(
+                        "Failed to update escrow status embed on Funded:",
+                        e,
+                      );
+                    }
+                  },
+                  { emitOnStart: false },
+                );
+              }
+            } catch (e) {
+              console.error(
+                "Failed to send or initialize escrow status embed:",
+                e,
+              );
+            }
+          }
+          // Post an escrow status embed and watch for funding to update it
+          if (escrowAddress) {
+            try {
+              const flowNow = getFlow(uid);
+              const buyerId2 =
+                flowNow.role === "buyer" ? uid : flowNow.counterpartyId;
+              const sellerId2 =
+                flowNow.role === "seller" ? uid : flowNow.counterpartyId;
+
+              // If an embed was not sent yet, create it
+              if (!flowNow?.escrowStatusMessageId) {
+                const state = await getEscrowState(escrowAddress);
+                const statusEmbed = buildEscrowStatusEmbed({
+                  escrowAddress,
+                  buyerId: buyerId2,
+                  sellerId: sellerId2,
+                  statusText: state.statusText,
+                  amountEth: state.amountEth,
+                  color: state.color,
+                  title: "Escrow Status",
+                  description:
+                    "This will update automatically when the buyer funds the escrow.",
+                });
+                const statusMsg = await interaction.channel.send({
+                  embeds: [statusEmbed],
+                });
+                setFlow(uid, { escrowStatusMessageId: statusMsg.id });
+                if (flowNow?.counterpartyId) {
+                  setFlow(flowNow.counterpartyId, {
+                    escrowStatusMessageId: statusMsg.id,
+                  });
+                }
+              }
+
+              // Start a watcher once per trade to update the embed on Funded
+              if (!flowNow?.escrowWatcherStarted) {
+                setFlow(uid, { escrowWatcherStarted: true });
+                if (flowNow?.counterpartyId) {
+                  setFlow(flowNow.counterpartyId, {
+                    escrowWatcherStarted: true,
+                  });
+                }
+
+                watchEscrowFunded(
+                  escrowAddress,
+                  async () => {
+                    try {
+                      const updated = await getEscrowState(escrowAddress);
+                      const embed2 = buildEscrowStatusEmbed({
+                        escrowAddress,
+                        buyerId: buyerId2,
+                        sellerId: sellerId2,
+                        statusText: updated.statusText,
+                        amountEth: updated.amountEth,
+                        color: updated.color,
+                        title: "Escrow Status",
+                        description: "Escrow status has been updated.",
+                      });
+                      const msgId = getFlow(uid)?.escrowStatusMessageId;
+                      if (msgId) {
+                        const msg =
+                          await interaction.channel.messages.fetch(msgId);
+                        await msg.edit({ embeds: [embed2] });
+                      }
+                    } catch (e) {
+                      console.error(
+                        "Failed to update escrow status embed on Funded:",
+                        e,
+                      );
+                    }
+                  },
+                  { emitOnStart: false },
+                );
+              }
+            } catch (e) {
+              console.error(
+                "Failed to send or initialize escrow status embed:",
+                e,
+              );
+            }
+          }
         } catch (e) {
           await interaction.channel.send({
             content: `❌ Failed to create trade: ${e.message}`,
           });
         }
       }
-      await interaction.reply({
+      await interaction.editReply({
         content: getFlow(uid)?.escrowAddress
           ? `Buyer address registered. Please send $${f?.priceUsd ?? "N/A"} to ${getFlow(uid).escrowAddress}.`
           : "Buyer address registered.",
-        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -418,6 +582,7 @@ export async function execute(client, interaction) {
       interaction.customId === "seller_address_modal"
     ) {
       const uid = interaction.user.id;
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const addr = interaction.fields.getTextInputValue("seller_address");
       setSellerAddress(uid, addr);
       const flow = getFlow(uid);
@@ -471,11 +636,10 @@ export async function execute(client, interaction) {
           });
         }
       }
-      await interaction.reply({
+      await interaction.editReply({
         content: getFlow(uid)?.escrowAddress
           ? `Seller address registered. Escrow: ${getFlow(uid).escrowAddress}.`
           : "Seller address registered.",
-        flags: MessageFlags.Ephemeral,
       });
     }
   } catch (err) {
