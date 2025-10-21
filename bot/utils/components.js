@@ -72,7 +72,7 @@ export function buildDescriptionModal() {
 export function buildConfirmationEmbed({ buyerId, sellerId, description, priceUsd }) {
   return new EmbedBuilder()
     .setTitle("💼 Confirm Trade Details")
-    .setDescription(`Please review the details below before proceeding:\n\n`)
+    .setDescription("Please review the details below before proceeding:\n\n")
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
@@ -91,8 +91,8 @@ export function buildCreatedEmbed({ buyerId, sellerId, description }) {
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
       { name: "Item", value: description, inline: false }
     )
-    .setFooter({ text: "Built for trustless digital trading." })
-    .setColor("#2ecc71");
+    .setFooter({ text: "Confirm to continue securely." })
+    .setColor(0x2ecc71);
 }
 
 export function buildCreateThreadRow() {
