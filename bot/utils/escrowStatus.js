@@ -9,8 +9,11 @@
  * - Resilient to transient Discord API errors with descriptive logging
  */
 
-import { getEscrowState, watchEscrowFunded } from "./escrow.js";
-import { buildEscrowStatusEmbed } from "./components.js";
+import { getEscrowState, watchEscrowFunded, ESCROW_STATUS } from "./escrow.js";
+import {
+  buildEscrowStatusEmbed,
+  buildDeliveryActionsRow,
+} from "./components.js";
 import { getFlow, setFlow } from "./flowState.js";
 
 /**
@@ -47,10 +50,13 @@ export async function initEscrowStatusAndWatcher({
   options = {},
 }) {
   if (!channel || typeof channel.send !== "function") {
-    throw new Error("initEscrowStatusAndWatcher: 'channel' is required and must support send()");
+    throw new Error(
+      "initEscrowStatusAndWatcher: 'channel' is required and must support send()",
+    );
   }
   if (!uid) throw new Error("initEscrowStatusAndWatcher: 'uid' is required");
-  if (!escrowAddress) throw new Error("initEscrowStatusAndWatcher: 'escrowAddress' is required");
+  if (!escrowAddress)
+    throw new Error("initEscrowStatusAndWatcher: 'escrowAddress' is required");
 
   const {
     backfill = true,
@@ -91,7 +97,15 @@ export async function initEscrowStatusAndWatcher({
         description: initialDescription,
       });
 
-      const statusMsg = await channel.send({ embeds: [statusEmbed] });
+      const components =
+        state &&
+        (state.status === ESCROW_STATUS.Funded || state.statusText === "Funded")
+          ? [buildDeliveryActionsRow()]
+          : [];
+      const statusMsg = await channel.send({
+        embeds: [statusEmbed],
+        components,
+      });
       messageId = statusMsg?.id ?? null;
 
       if (messageId) {
@@ -104,7 +118,10 @@ export async function initEscrowStatusAndWatcher({
       messageId = flow.escrowStatusMessageId;
     }
   } catch (e) {
-    console.error("initEscrowStatusAndWatcher: failed to send initial status embed:", e);
+    console.error(
+      "initEscrowStatusAndWatcher: failed to send initial status embed:",
+      e,
+    );
   }
 
   // 2) Start a single watcher that updates the embed when Funded is observed (with optional backfill).
@@ -136,17 +153,27 @@ export async function initEscrowStatusAndWatcher({
               description: updatedDescription,
             });
 
-            const currentMsgId = getFlow(uid)?.escrowStatusMessageId ?? messageId;
+            const currentMsgId =
+              getFlow(uid)?.escrowStatusMessageId ?? messageId;
             if (currentMsgId) {
               try {
                 const msg = await channel.messages.fetch(currentMsgId);
-                await msg.edit({ embeds: [embed2] });
+                await msg.edit({
+                  embeds: [embed2],
+                  components: [buildDeliveryActionsRow()],
+                });
               } catch (e) {
-                console.error("initEscrowStatusAndWatcher: failed to edit status embed:", e);
+                console.error(
+                  "initEscrowStatusAndWatcher: failed to edit status embed:",
+                  e,
+                );
               }
             }
           } catch (e) {
-            console.error("initEscrowStatusAndWatcher: failed to update on Funded:", e);
+            console.error(
+              "initEscrowStatusAndWatcher: failed to update on Funded:",
+              e,
+            );
           }
         },
         { emitOnStart: !!backfill },
