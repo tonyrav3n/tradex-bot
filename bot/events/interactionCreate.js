@@ -121,6 +121,14 @@ export async function execute(client, interaction) {
 
         const buyerId = flow.role === "buyer" ? uid : flow.counterpartyId;
         const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
+        // Lock buyer/seller Discord IDs in flow for both parties
+        setFlow(uid, { buyerDiscordId: buyerId, sellerDiscordId: sellerId });
+        if (flow?.counterpartyId) {
+          setFlow(flow.counterpartyId, {
+            buyerDiscordId: buyerId,
+            sellerDiscordId: sellerId,
+          });
+        }
 
         // Build confirmation embed to seed the thread
         const embed = buildCreatedEmbed({
@@ -179,7 +187,9 @@ export async function execute(client, interaction) {
           });
           return;
         }
-        const buyerId = flow.role === "buyer" ? uid : flow.counterpartyId;
+        const buyerId =
+          flow.buyerDiscordId ??
+          (flow.role === "buyer" ? uid : flow.counterpartyId);
         if (uid !== buyerId) {
           await interaction.reply({
             content: "You are not the buyer for this trade.",
@@ -205,7 +215,9 @@ export async function execute(client, interaction) {
           });
           return;
         }
-        const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
+        const sellerId =
+          flow.sellerDiscordId ??
+          (flow.role === "seller" ? uid : flow.counterpartyId);
         if (uid !== sellerId) {
           await interaction.reply({
             content: "You are not the seller for this trade.",
@@ -322,6 +334,16 @@ export async function execute(client, interaction) {
     ) {
       const uid = interaction.user.id;
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const fcheck = getFlow(uid);
+      const lockedBuyerId =
+        fcheck?.buyerDiscordId ??
+        (fcheck?.role === "buyer" ? uid : fcheck?.counterpartyId);
+      if (uid !== lockedBuyerId) {
+        await interaction.editReply({
+          content: "You are not the buyer for this trade.",
+        });
+        return;
+      }
       const addr = interaction.fields.getTextInputValue("buyer_address");
       setBuyerAddress(uid, addr);
       const flow = getFlow(uid);
@@ -385,9 +407,11 @@ export async function execute(client, interaction) {
             try {
               const flowNow = getFlow(uid);
               const buyerId2 =
-                flowNow.role === "buyer" ? uid : flowNow.counterpartyId;
+                flowNow.buyerDiscordId ??
+                (flowNow.role === "buyer" ? uid : flowNow.counterpartyId);
               const sellerId2 =
-                flowNow.role === "seller" ? uid : flowNow.counterpartyId;
+                flowNow.sellerDiscordId ??
+                (flowNow.role === "seller" ? uid : flowNow.counterpartyId);
 
               // If an embed was not sent yet, create it
               if (!flowNow?.escrowStatusMessageId) {
@@ -562,6 +586,16 @@ export async function execute(client, interaction) {
     ) {
       const uid = interaction.user.id;
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const fcheck = getFlow(uid);
+      const lockedSellerId =
+        fcheck?.sellerDiscordId ??
+        (fcheck?.role === "seller" ? uid : fcheck?.counterpartyId);
+      if (uid !== lockedSellerId) {
+        await interaction.editReply({
+          content: "You are not the seller for this trade.",
+        });
+        return;
+      }
       const addr = interaction.fields.getTextInputValue("seller_address");
       setSellerAddress(uid, addr);
       const flow = getFlow(uid);
@@ -626,9 +660,11 @@ export async function execute(client, interaction) {
             try {
               const flowNow = getFlow(uid);
               const buyerId2 =
-                flowNow.role === "buyer" ? uid : flowNow.counterpartyId;
+                flowNow.buyerDiscordId ??
+                (flowNow.role === "buyer" ? uid : flowNow.counterpartyId);
               const sellerId2 =
-                flowNow.role === "seller" ? uid : flowNow.counterpartyId;
+                flowNow.sellerDiscordId ??
+                (flowNow.role === "seller" ? uid : flowNow.counterpartyId);
 
               // If an embed was not sent yet, create it
               if (!flowNow?.escrowStatusMessageId) {
