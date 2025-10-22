@@ -27,8 +27,7 @@ import {
   buildAgreeRow,
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
-import { createTrade } from "../utils/createTrade.js";
-import { deriveEscrowAddressFromTx } from "../utils/deriveEscrowAddress.js";
+import { createAndAnnounceTrade } from "../utils/tradeFlow.js";
 import { initEscrowStatusAndWatcher } from "../utils/escrowStatus.js";
 
 /**
@@ -172,72 +171,30 @@ async function handleBuyerAddressModal(client, interaction) {
     f?.buyerAddress &&
     f?.sellerAddress
   ) {
-    let creatingMsg;
     try {
-      creatingMsg = await interaction.channel.send({
-        content: "⏳ Creating trade...",
+      await createAndAnnounceTrade({
+        channel: interaction.channel,
+        uid,
+        buyerAddress: f.buyerAddress,
+        sellerAddress: f.sellerAddress,
+        amountEth: "0.001",
+        initOptions: {
+          backfill: true,
+          title: "Escrow Status",
+          initialDescription:
+            "This will update automatically when the buyer funds the escrow.",
+          updatedDescription: "Escrow status has been updated.",
+        },
       });
-      const txHash = await createTrade(
-        f.buyerAddress,
-        f.sellerAddress,
-        "0.001",
-      );
-      const escrowAddress = await deriveEscrowAddressFromTx(txHash);
-
-      if (escrowAddress) {
-        setFlow(uid, { escrowAddress });
-        const flow2 = getFlow(uid);
-        if (flow2?.counterpartyId) {
-          setFlow(flow2.counterpartyId, { escrowAddress });
-        }
-      }
-
-      await creatingMsg.edit({
-        content: `✅ Trade created! Tx: ${txHash}${escrowAddress ? ` | Escrow: ${escrowAddress}` : ""}`,
-      });
-
-      // Initialize escrow status embed and watcher with backfill
-      if (escrowAddress) {
-        try {
-          await initEscrowStatusAndWatcher({
-            channel: interaction.channel,
-            uid,
-            escrowAddress,
-            options: {
-              backfill: true,
-              title: "Escrow Status",
-              initialDescription:
-                "This will update automatically when the buyer funds the escrow.",
-              updatedDescription: "Escrow status has been updated.",
-            },
-          });
-        } catch (e) {
-          console.error("Failed to initialize status embed/watcher:", e);
-        }
-      }
     } catch (e) {
-      try {
-        if (creatingMsg) {
-          await creatingMsg.edit({
-            content: `❌ Failed to create trade: ${e.message}`,
-          });
-        } else {
-          await interaction.channel.send({
-            content: `❌ Failed to create trade: ${e.message}`,
-          });
-        }
-      } catch {
-        await interaction.channel.send({
-          content: `❌ Failed to create trade: ${e.message}`,
-        });
-      }
+      await interaction.channel.send({
+        content: `❌ Failed to create trade: ${e.message}`,
+      });
     }
   }
 
   await interaction.editReply({
-    content: getFlow(uid)?.escrowAddress
-      ? `Buyer address registered. Please fund ~$${f?.priceUsd ?? "N/A"} worth of ETH to ${getFlow(uid).escrowAddress}. You can send a normal ETH transfer or call fund() on the contract.`
-      : "Buyer address registered.",
+    content: "Buyer address registered.",
   });
 }
 
@@ -307,75 +264,30 @@ async function handleSellerAddressModal(client, interaction) {
     f?.buyerAddress &&
     f?.sellerAddress
   ) {
-    let creatingMsg;
     try {
-      creatingMsg = await interaction.channel.send({
-        content: "⏳ Creating trade...",
+      await createAndAnnounceTrade({
+        channel: interaction.channel,
+        uid,
+        buyerAddress: f.buyerAddress,
+        sellerAddress: f.sellerAddress,
+        amountEth: "0.001",
+        initOptions: {
+          backfill: true,
+          title: "Escrow Status",
+          initialDescription:
+            "This will update automatically when the buyer funds the escrow.",
+          updatedDescription: "Escrow status has been updated.",
+        },
       });
-      const txHash = await createTrade(
-        f.buyerAddress,
-        f.sellerAddress,
-        "0.001",
-      );
-      const escrowAddress = await deriveEscrowAddressFromTx(txHash);
-
-      if (escrowAddress) {
-        setFlow(uid, { escrowAddress });
-        const flow2 = getFlow(uid);
-        if (flow2?.counterpartyId) {
-          setFlow(flow2.counterpartyId, { escrowAddress });
-        }
-      }
-
-      await creatingMsg.edit({
-        content: `✅ Trade created! Tx: ${txHash}${escrowAddress ? ` | Escrow: ${escrowAddress}` : ""}`,
-      });
-
-      // Initialize escrow status embed and watcher with backfill
-      if (escrowAddress) {
-        try {
-          await initEscrowStatusAndWatcher({
-            channel: interaction.channel,
-            uid,
-            escrowAddress,
-            options: {
-              backfill: true,
-              title: "Escrow Status",
-              initialDescription:
-                "This will update automatically when the buyer funds the escrow.",
-              updatedDescription: "Escrow status has been updated.",
-            },
-          });
-        } catch (e) {
-          console.error(
-            "Failed to initialize status embed/watcher (seller path):",
-            e,
-          );
-        }
-      }
     } catch (e) {
-      try {
-        if (creatingMsg) {
-          await creatingMsg.edit({
-            content: `❌ Failed to create trade: ${e.message}`,
-          });
-        } else {
-          await interaction.channel.send({
-            content: `❌ Failed to create trade: ${e.message}`,
-          });
-        }
-      } catch {
-        await interaction.channel.send({
-          content: `❌ Failed to create trade: ${e.message}`,
-        });
-      }
+      await interaction.channel.send({
+        content: `❌ Failed to create trade: ${e.message}`,
+      });
     }
   }
 
   await interaction.editReply({
-    content: getFlow(uid)?.escrowAddress
-      ? `Seller address registered. Escrow: ${getFlow(uid).escrowAddress}.`
-      : "Seller address registered.",
+    content: "Seller address registered.",
   });
 }
 
