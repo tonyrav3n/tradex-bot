@@ -226,3 +226,46 @@ export function buildDeliveryActionsRow() {
       .setStyle(ButtonStyle.Success),
   );
 }
+
+/**
+ * Single-action row: only Mark Delivered (for Funded state)
+ */
+export function buildMarkDeliveredRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("mark_delivered")
+      .setLabel("Mark Delivered")
+      .setStyle(ButtonStyle.Primary),
+  );
+}
+
+/**
+ * Single-action row: only Approve & Release (for Delivered state)
+ */
+export function buildApproveReleaseRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("approve_release")
+      .setLabel("Approve & Release")
+      .setStyle(ButtonStyle.Success),
+  );
+}
+
+/**
+ * Helper to choose status-specific action buttons.
+ * Accepts either numeric status (enum) or status text.
+ *
+ * - Created/Completed/Cancelled/Disputed: no actions
+ * - Funded: Mark Delivered
+ * - Delivered: Approve & Release
+ */
+export function buildActionsForStatus(status) {
+  const s = typeof status === "string" ? status.toLowerCase() : Number(status);
+  if (s === 1 || s === "funded") {
+    return [buildMarkDeliveredRow()];
+  }
+  if (s === 2 || s === "delivered") {
+    return [buildApproveReleaseRow()];
+  }
+  return [];
+}

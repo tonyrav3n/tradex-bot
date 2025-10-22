@@ -9,11 +9,8 @@
  * - Resilient to transient Discord API errors with descriptive logging
  */
 
-import { getEscrowState, watchEscrowFunded, ESCROW_STATUS } from "./escrow.js";
-import {
-  buildEscrowStatusEmbed,
-  buildDeliveryActionsRow,
-} from "./components.js";
+import { getEscrowState, watchEscrowFunded } from "./escrow.js";
+import { buildEscrowStatusEmbed, buildActionsForStatus } from "./components.js";
 import { getFlow, setFlow } from "./flowState.js";
 
 /**
@@ -97,11 +94,9 @@ export async function initEscrowStatusAndWatcher({
         description: initialDescription,
       });
 
-      const components =
-        state &&
-        (state.status === ESCROW_STATUS.Funded || state.statusText === "Funded")
-          ? [buildDeliveryActionsRow()]
-          : [];
+      const components = buildActionsForStatus(
+        state?.status ?? state?.statusText,
+      );
       const statusMsg = await channel.send({
         embeds: [statusEmbed],
         components,
@@ -160,7 +155,9 @@ export async function initEscrowStatusAndWatcher({
                 const msg = await channel.messages.fetch(currentMsgId);
                 await msg.edit({
                   embeds: [embed2],
-                  components: [buildDeliveryActionsRow()],
+                  components: buildActionsForStatus(
+                    updated?.status ?? updated?.statusText,
+                  ),
                 });
               } catch (e) {
                 console.error(

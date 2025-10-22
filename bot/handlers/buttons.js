@@ -33,7 +33,7 @@ import {
   buildBuyerAddressModal,
   buildSellerAddressModal,
   buildEscrowStatusEmbed,
-  buildDeliveryActionsRow,
+  buildActionsForStatus,
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { publicClient } from "../utils/client.js";
@@ -49,7 +49,10 @@ import { deriveEscrowAddressFromTx } from "../utils/deriveEscrowAddress.js";
  * @param {import('discord.js').ButtonInteraction} interaction
  * @param {object} options
  */
-async function safeDeferReply(interaction, options = { flags: MessageFlags.Ephemeral }) {
+async function safeDeferReply(
+  interaction,
+  options = { flags: MessageFlags.Ephemeral },
+) {
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply(options);
   }
@@ -102,7 +105,8 @@ async function handleSelectRole(interaction, role) {
   const uid = interaction.user.id;
   setFlow(uid, {
     role,
-    originalInteractionToken: getFlow(uid)?.originalInteractionToken || interaction.token,
+    originalInteractionToken:
+      getFlow(uid)?.originalInteractionToken || interaction.token,
   });
 
   // Role buttons are in an ephemeral message; use deferUpdate to replace components
@@ -121,7 +125,8 @@ async function handleCreateThread(client, interaction) {
   const flow = getFlow(uid);
   if (!flow || !flow.role || !flow.counterpartyId || !flow.description) {
     return interaction.update({
-      content: "Trade details are incomplete. Please restart with Create Trade.",
+      content:
+        "Trade details are incomplete. Please restart with Create Trade.",
       components: [],
     });
   }
@@ -175,7 +180,10 @@ async function handleCreateThread(client, interaction) {
   });
 
   setFlow(uid, { threadId: thread.id, agreeMessageId: agreeMsg.id });
-  setFlow(flow.counterpartyId, { threadId: thread.id, agreeMessageId: agreeMsg.id });
+  setFlow(flow.counterpartyId, {
+    threadId: thread.id,
+    agreeMessageId: agreeMsg.id,
+  });
 
   const originalToken = flow?.originalInteractionToken;
   const appId = client?.application?.id;
@@ -206,7 +214,8 @@ async function handleAgreeBuyer(interaction) {
     });
     return;
   }
-  const buyerId = flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
+  const buyerId =
+    flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
   if (uid !== buyerId) {
     await interaction.reply({
       content: "You are not the buyer for this trade.",
@@ -237,7 +246,9 @@ async function handleAgreeSeller(interaction) {
     });
     return;
   }
-  const sellerId = flow.sellerDiscordId ?? (flow.role === "seller" ? uid : flow.counterpartyId);
+  const sellerId =
+    flow.sellerDiscordId ??
+    (flow.role === "seller" ? uid : flow.counterpartyId);
   if (uid !== sellerId) {
     await interaction.reply({
       content: "You are not the seller for this trade.",
@@ -268,7 +279,9 @@ async function handleMarkDelivered(interaction) {
     });
     return;
   }
-  const sellerId = flow.sellerDiscordId ?? (flow.role === "seller" ? uid : flow.counterpartyId);
+  const sellerId =
+    flow.sellerDiscordId ??
+    (flow.role === "seller" ? uid : flow.counterpartyId);
   if (uid !== sellerId) {
     await interaction.reply({
       content: "You are not the seller for this trade.",
@@ -299,8 +312,12 @@ async function handleMarkDelivered(interaction) {
     await publicClient.waitForTransactionReceipt({ hash: txHash });
 
     const updated = await getEscrowState(escrowAddress);
-    const buyerId2 = flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
-    const sellerId2 = flow.sellerDiscordId ?? (flow.role === "seller" ? uid : flow.counterpartyId);
+    const buyerId2 =
+      flow.buyerDiscordId ??
+      (flow.role === "buyer" ? uid : flow.counterpartyId);
+    const sellerId2 =
+      flow.sellerDiscordId ??
+      (flow.role === "seller" ? uid : flow.counterpartyId);
 
     const embed2 = buildEscrowStatusEmbed({
       escrowAddress,
@@ -316,7 +333,12 @@ async function handleMarkDelivered(interaction) {
     if (msgId) {
       try {
         const msg = await interaction.channel.messages.fetch(msgId);
-        await msg.edit({ embeds: [embed2], components: [buildDeliveryActionsRow()] });
+        await msg.edit({
+          embeds: [embed2],
+          components: buildActionsForStatus(
+            updated.status ?? updated.statusText,
+          ),
+        });
       } catch {}
     }
 
@@ -345,7 +367,8 @@ async function handleApproveRelease(interaction) {
     });
     return;
   }
-  const buyerId = flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
+  const buyerId =
+    flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
   if (uid !== buyerId) {
     await interaction.reply({
       content: "You are not the buyer for this trade.",
@@ -376,8 +399,12 @@ async function handleApproveRelease(interaction) {
     await publicClient.waitForTransactionReceipt({ hash: txHash });
 
     const updated = await getEscrowState(escrowAddress);
-    const buyerId2 = flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
-    const sellerId2 = flow.sellerDiscordId ?? (flow.role === "seller" ? uid : flow.counterpartyId);
+    const buyerId2 =
+      flow.buyerDiscordId ??
+      (flow.role === "buyer" ? uid : flow.counterpartyId);
+    const sellerId2 =
+      flow.sellerDiscordId ??
+      (flow.role === "seller" ? uid : flow.counterpartyId);
 
     const embed2 = buildEscrowStatusEmbed({
       escrowAddress,
@@ -393,7 +420,12 @@ async function handleApproveRelease(interaction) {
     if (msgId) {
       try {
         const msg = await interaction.channel.messages.fetch(msgId);
-        await msg.edit({ embeds: [embed2], components: [buildDeliveryActionsRow()] });
+        await msg.edit({
+          embeds: [embed2],
+          components: buildActionsForStatus(
+            updated.status ?? updated.statusText,
+          ),
+        });
       } catch {}
     }
 

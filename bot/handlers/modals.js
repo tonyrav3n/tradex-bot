@@ -172,8 +172,16 @@ async function handleBuyerAddressModal(client, interaction) {
     f?.buyerAddress &&
     f?.sellerAddress
   ) {
+    let creatingMsg;
     try {
-      const txHash = await createTrade(f.buyerAddress, f.sellerAddress, "0.001");
+      creatingMsg = await interaction.channel.send({
+        content: "⏳ Creating trade...",
+      });
+      const txHash = await createTrade(
+        f.buyerAddress,
+        f.sellerAddress,
+        "0.001",
+      );
       const escrowAddress = await deriveEscrowAddressFromTx(txHash);
 
       if (escrowAddress) {
@@ -184,7 +192,7 @@ async function handleBuyerAddressModal(client, interaction) {
         }
       }
 
-      await interaction.channel.send({
+      await creatingMsg.edit({
         content: `✅ Trade created! Tx: ${txHash}${escrowAddress ? ` | Escrow: ${escrowAddress}` : ""}`,
       });
 
@@ -208,9 +216,21 @@ async function handleBuyerAddressModal(client, interaction) {
         }
       }
     } catch (e) {
-      await interaction.channel.send({
-        content: `❌ Failed to create trade: ${e.message}`,
-      });
+      try {
+        if (creatingMsg) {
+          await creatingMsg.edit({
+            content: `❌ Failed to create trade: ${e.message}`,
+          });
+        } else {
+          await interaction.channel.send({
+            content: `❌ Failed to create trade: ${e.message}`,
+          });
+        }
+      } catch {
+        await interaction.channel.send({
+          content: `❌ Failed to create trade: ${e.message}`,
+        });
+      }
     }
   }
 
@@ -287,8 +307,16 @@ async function handleSellerAddressModal(client, interaction) {
     f?.buyerAddress &&
     f?.sellerAddress
   ) {
+    let creatingMsg;
     try {
-      const txHash = await createTrade(f.buyerAddress, f.sellerAddress, "0.001");
+      creatingMsg = await interaction.channel.send({
+        content: "⏳ Creating trade...",
+      });
+      const txHash = await createTrade(
+        f.buyerAddress,
+        f.sellerAddress,
+        "0.001",
+      );
       const escrowAddress = await deriveEscrowAddressFromTx(txHash);
 
       if (escrowAddress) {
@@ -299,7 +327,7 @@ async function handleSellerAddressModal(client, interaction) {
         }
       }
 
-      await interaction.channel.send({
+      await creatingMsg.edit({
         content: `✅ Trade created! Tx: ${txHash}${escrowAddress ? ` | Escrow: ${escrowAddress}` : ""}`,
       });
 
@@ -319,13 +347,28 @@ async function handleSellerAddressModal(client, interaction) {
             },
           });
         } catch (e) {
-          console.error("Failed to initialize status embed/watcher (seller path):", e);
+          console.error(
+            "Failed to initialize status embed/watcher (seller path):",
+            e,
+          );
         }
       }
     } catch (e) {
-      await interaction.channel.send({
-        content: `❌ Failed to create trade: ${e.message}`,
-      });
+      try {
+        if (creatingMsg) {
+          await creatingMsg.edit({
+            content: `❌ Failed to create trade: ${e.message}`,
+          });
+        } else {
+          await interaction.channel.send({
+            content: `❌ Failed to create trade: ${e.message}`,
+          });
+        }
+      } catch {
+        await interaction.channel.send({
+          content: `❌ Failed to create trade: ${e.message}`,
+        });
+      }
     }
   }
 
