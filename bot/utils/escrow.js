@@ -1,4 +1,4 @@
-import { publicClient } from "./client.js";
+import { publicClient, walletClient } from "./client.js";
 import { formatEther } from "viem";
 
 /**
@@ -295,4 +295,22 @@ export async function waitForFunded(escrowAddress, options = {}) {
     }
     await new Promise((r) => setTimeout(r, intervalMs));
   }
+}
+
+export async function markEscrowDelivered(escrowAddress) {
+  return walletClient.writeContract({
+    address: escrowAddress,
+    abi: ESCROW_ABI,
+    functionName: "markDelivered",
+    args: [],
+  });
+}
+
+export async function approveEscrowDelivery(escrowAddress) {
+  return walletClient.writeContract({
+    address: escrowAddress,
+    abi: ESCROW_ABI,
+    functionName: "approveDelivery",
+    args: [],
+  });
 }

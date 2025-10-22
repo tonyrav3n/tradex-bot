@@ -213,3 +213,16 @@ export function buildEscrowStatusEmbed({
 
   return embed;
 }
+
+export function buildDeliveryActionsRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("mark_delivered")
+      .setLabel("Mark Delivered")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("approve_release")
+      .setLabel("Approve & Release")
+      .setStyle(ButtonStyle.Success),
+  );
+}

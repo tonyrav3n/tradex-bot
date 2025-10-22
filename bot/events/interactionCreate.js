@@ -22,14 +22,23 @@ import {
   buildBuyerAddressModal,
   buildSellerAddressModal,
   buildEscrowStatusEmbed,
+  buildDeliveryActionsRow,
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { publicClient } from "../utils/client.js";
 import { FACTORY_ABI } from "../utils/contract.js";
 import { decodeEventLog } from "viem";
 import { deriveEscrowAddressFromTx } from "../utils/deriveEscrowAddress.js";
-import { getEscrowState, watchEscrowFunded } from "../utils/escrow.js";
+import {
+  getEscrowState,
+  watchEscrowFunded,
+  markEscrowDelivered,
+  approveEscrowDelivery,
+} from "../utils/escrow.js";
 import { initEscrowStatusAndWatcher } from "../utils/escrowStatus.js";
+import { handleButton } from "../handlers/buttons.js";
+import { handleModal } from "../handlers/modals.js";
+import { handleSelect } from "../handlers/selects.js";
 const BOT_ADDRESS = process.env.BOT_ADDRESS || "";
 
 export const name = Events.InteractionCreate;
@@ -42,6 +51,20 @@ export async function execute(client, interaction) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
       await command.execute(interaction);
+      return;
+    }
+
+    // Dispatch to extracted handlers
+    if (interaction.isButton()) {
+      await handleButton(client, interaction);
+      return;
+    }
+    if (interaction.isModalSubmit && interaction.isModalSubmit()) {
+      await handleModal(client, interaction);
+      return;
+    }
+    if (interaction.isUserSelectMenu && interaction.isUserSelectMenu()) {
+      await handleSelect(client, interaction);
       return;
     }
 
@@ -232,6 +255,159 @@ export async function execute(client, interaction) {
           });
         } else {
           await interaction.showModal(buildSellerAddressModal());
+        }
+      } else if (interaction.customId === "mark_delivered") {
+        const uid = interaction.user.id;
+        const flow = getFlow(uid);
+        if (!flow) {
+          await interaction.reply({
+            content: "No active trade flow found.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        const sellerId =
+          flow.sellerDiscordId ??
+          (flow.role === "seller" ? uid : flow.counterpartyId);
+        if (uid !== sellerId) {
+          await interaction.reply({
+            content: "You are not the seller for this trade.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        const escrowAddress = flow.escrowAddress;
+        if (!escrowAddress) {
+          await interaction.reply({
+            content: "Escrow is not created yet.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        try {
+          const state = await getEscrowState(escrowAddress);
+          if (Number(state.status) !== 1) {
+            await interaction.reply({
+              content: "Trade is not at 'Funded' state.",
+              flags: MessageFlags.Ephemeral,
+            });
+            return;
+          }
+          const txHash = await markEscrowDelivered(escrowAddress);
+          await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+          const updated = await getEscrowState(escrowAddress);
+          const buyerId2 =
+            flow.buyerDiscordId ??
+            (flow.role === "buyer" ? uid : flow.counterpartyId);
+          const sellerId2 =
+            flow.sellerDiscordId ??
+            (flow.role === "seller" ? uid : flow.counterpartyId);
+          const embed2 = buildEscrowStatusEmbed({
+            escrowAddress,
+            buyerId: buyerId2,
+            sellerId: sellerId2,
+            statusText: updated.statusText,
+            amountEth: updated.amountEth,
+            color: updated.color,
+            title: "Escrow Status",
+            description: "Seller marked as Delivered.",
+          });
+          const msgId = getFlow(uid)?.escrowStatusMessageId;
+          if (msgId) {
+            try {
+              const msg = await interaction.channel.messages.fetch(msgId);
+              await msg.edit({ embeds: [embed2] });
+            } catch {}
+          }
+
+          await interaction.reply({
+            content: `✅ Marked delivered. Tx: ${txHash}`,
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (e) {
+          await interaction.reply({
+            content: `❌ Failed to mark delivered: ${e.message}`,
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+      } else if (interaction.customId === "approve_release") {
+        const uid = interaction.user.id;
+        const flow = getFlow(uid);
+        if (!flow) {
+          await interaction.reply({
+            content: "No active trade flow found.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        const buyerId =
+          flow.buyerDiscordId ??
+          (flow.role === "buyer" ? uid : flow.counterpartyId);
+        if (uid !== buyerId) {
+          await interaction.reply({
+            content: "You are not the buyer for this trade.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        const escrowAddress = flow.escrowAddress;
+        if (!escrowAddress) {
+          await interaction.reply({
+            content: "Escrow is not created yet.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        try {
+          const state = await getEscrowState(escrowAddress);
+          if (Number(state.status) !== 2) {
+            await interaction.reply({
+              content: "Trade is not at 'Delivered' state.",
+              flags: MessageFlags.Ephemeral,
+            });
+            return;
+          }
+          const txHash = await approveEscrowDelivery(escrowAddress);
+          await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+          const updated = await getEscrowState(escrowAddress);
+          const buyerId2 =
+            flow.buyerDiscordId ??
+            (flow.role === "buyer" ? uid : flow.counterpartyId);
+          const sellerId2 =
+            flow.sellerDiscordId ??
+            (flow.role === "seller" ? uid : flow.counterpartyId);
+          const embed2 = buildEscrowStatusEmbed({
+            escrowAddress,
+            buyerId: buyerId2,
+            sellerId: sellerId2,
+            statusText: updated.statusText,
+            amountEth: updated.amountEth,
+            color: updated.color,
+            title: "Escrow Status",
+            description: "Buyer approved delivery. Funds released.",
+          });
+          const msgId = getFlow(uid)?.escrowStatusMessageId;
+          if (msgId) {
+            try {
+              const msg = await interaction.channel.messages.fetch(msgId);
+              await msg.edit({
+                embeds: [embed2],
+                components: [buildDeliveryActionsRow()],
+              });
+            } catch {}
+          }
+
+          await interaction.reply({
+            content: `✅ Approved and released. Tx: ${txHash}`,
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (e) {
+          await interaction.reply({
+            content: `❌ Failed to approve/release: ${e.message}`,
+            flags: MessageFlags.Ephemeral,
+          });
         }
       }
     }
@@ -429,6 +605,7 @@ export async function execute(client, interaction) {
                 });
                 const statusMsg = await interaction.channel.send({
                   embeds: [statusEmbed],
+                  components: [buildDeliveryActionsRow()],
                 });
                 setFlow(uid, { escrowStatusMessageId: statusMsg.id });
                 if (flowNow?.counterpartyId) {
@@ -510,6 +687,7 @@ export async function execute(client, interaction) {
                 });
                 const statusMsg = await interaction.channel.send({
                   embeds: [statusEmbed],
+                  components: [buildDeliveryActionsRow()],
                 });
                 setFlow(uid, { escrowStatusMessageId: statusMsg.id });
                 if (flowNow?.counterpartyId) {
@@ -547,7 +725,10 @@ export async function execute(client, interaction) {
                       if (msgId) {
                         const msg =
                           await interaction.channel.messages.fetch(msgId);
-                        await msg.edit({ embeds: [embed2] });
+                        await msg.edit({
+                          embeds: [embed2],
+                          components: [buildDeliveryActionsRow()],
+                        });
                       }
                     } catch (e) {
                       console.error(
