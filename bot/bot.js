@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 
 import { Client, GatewayIntentBits, Collection, Events } from "discord.js";
+import { initDb } from "./utils/db.js";
 
 dotenv.config();
 
@@ -41,4 +42,5 @@ for (const file of fs.readdirSync(eventsPath)) {
   }
 }
 
+await initDb();
 client.login(process.env.TOKEN);
