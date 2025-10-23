@@ -15,6 +15,9 @@
 *.hex
 *.solc-cache.json
 
+# Keep bot runtime ABIs in version control
+!bot/abi/**
+
 # Ignore node_modules if using Node.js environment
 node_modules/
 
@@ -37,13 +40,9 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Ignore local contract artifacts if using Hardhat or Truffle
-artifacts/
-contracts/*.dbg.json
-contracts/*.json
 
-# Keep Ignition deployments in version control (override artifacts ignore under ignition/)
-!ignition/deployments/**
+
+
 
 
 # Ignore other temporary files
