@@ -18,13 +18,7 @@
 
 import { MessageFlags, ChannelType } from "discord.js";
 import { createTrade } from "../utils/createTrade.js";
-import {
-  startFlow,
-  setFlow,
-  getFlow,
-  setBuyerAddress,
-  setSellerAddress,
-} from "../utils/flowState.js";
+import { startFlow, setFlow, getFlow } from "../utils/flowRepo.js";
 import {
   buildRoleButtonsRow,
   buildCounterpartySelectRow,
@@ -87,8 +81,8 @@ async function handleDemoCreate(interaction) {
  */
 async function handleStartFlow(client, interaction) {
   const uid = interaction.user.id;
-  startFlow(uid);
-  setFlow(uid, { originalInteractionToken: interaction.token });
+  await startFlow(uid);
+  await setFlow(uid, { originalInteractionToken: interaction.token });
 
   await safeDeferReply(interaction, { flags: MessageFlags.Ephemeral });
   await interaction.editReply({
@@ -103,10 +97,11 @@ async function handleStartFlow(client, interaction) {
  */
 async function handleSelectRole(interaction, role) {
   const uid = interaction.user.id;
-  setFlow(uid, {
+  const existing = await getFlow(uid);
+  await setFlow(uid, {
     role,
     originalInteractionToken:
-      getFlow(uid)?.originalInteractionToken || interaction.token,
+      (existing && existing.originalInteractionToken) || interaction.token,
   });
 
   // Role buttons are in an ephemeral message; use deferUpdate to replace components
@@ -122,7 +117,7 @@ async function handleSelectRole(interaction, role) {
  */
 async function handleCreateThread(client, interaction) {
   const uid = interaction.user.id;
-  const flow = getFlow(uid);
+  const flow = await getFlow(uid);
   if (!flow || !flow.role || !flow.counterpartyId || !flow.description) {
     return interaction.update({
       content:
@@ -131,10 +126,37 @@ async function handleCreateThread(client, interaction) {
     });
   }
   if (flow.threadId) {
-    return interaction.update({
-      content: `✅ Private thread already exists: <#${flow.threadId}>`,
-      components: [],
-    });
+    try {
+      const existingThread = await interaction.channel.threads.fetch(
+        flow.threadId,
+      );
+      if (existingThread) {
+        return interaction.update({
+          content: `✅ Private thread already exists: <#${flow.threadId}>`,
+          components: [],
+        });
+      }
+    } catch {
+      // Stale thread id; clear and proceed to create a fresh one
+      await setFlow(uid, {
+        threadId: null,
+        agreeMessageId: null,
+        buyerAgreed: false,
+        sellerAgreed: false,
+        buyerAddress: null,
+        sellerAddress: null,
+      });
+      if (flow?.counterpartyId) {
+        await setFlow(flow.counterpartyId, {
+          threadId: null,
+          agreeMessageId: null,
+          buyerAgreed: false,
+          sellerAgreed: false,
+          buyerAddress: null,
+          sellerAddress: null,
+        });
+      }
+    }
   }
 
   await interaction.update({
@@ -146,11 +168,30 @@ async function handleCreateThread(client, interaction) {
   const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
 
   // Lock buyer/seller Discord IDs for both parties
-  setFlow(uid, { buyerDiscordId: buyerId, sellerDiscordId: sellerId });
+  await setFlow(uid, {
+    buyerDiscordId: buyerId,
+    sellerDiscordId: sellerId,
+    buyerAgreed: false,
+    sellerAgreed: false,
+    buyerAddress: null,
+    sellerAddress: null,
+    escrowAddress: null,
+    escrowStatusMessageId: null,
+    escrowWatcherStarted: false,
+    agreeMessageId: null,
+  });
   if (flow?.counterpartyId) {
-    setFlow(flow.counterpartyId, {
+    await setFlow(flow.counterpartyId, {
       buyerDiscordId: buyerId,
       sellerDiscordId: sellerId,
+      buyerAgreed: false,
+      sellerAgreed: false,
+      buyerAddress: null,
+      sellerAddress: null,
+      escrowAddress: null,
+      escrowStatusMessageId: null,
+      escrowWatcherStarted: false,
+      agreeMessageId: null,
     });
   }
 
@@ -179,8 +220,8 @@ async function handleCreateThread(client, interaction) {
     components: [buildAgreeRow()],
   });
 
-  setFlow(uid, { threadId: thread.id, agreeMessageId: agreeMsg.id });
-  setFlow(flow.counterpartyId, {
+  await setFlow(uid, { threadId: thread.id, agreeMessageId: agreeMsg.id });
+  await setFlow(flow.counterpartyId, {
     threadId: thread.id,
     agreeMessageId: agreeMsg.id,
   });
@@ -205,7 +246,7 @@ async function handleCreateThread(client, interaction) {
  */
 async function handleAgreeBuyer(interaction) {
   const uid = interaction.user.id;
-  const flow = getFlow(uid);
+  const flow = await getFlow(uid);
   if (!flow) {
     await interaction.reply({
       content: "No active trade flow found.",
@@ -223,7 +264,20 @@ async function handleAgreeBuyer(interaction) {
     });
     return;
   }
-  if (flow.buyerAgreed) {
+  // Guard against stale flow: ensure this agree action is for the current thread
+  const currentThreadId = interaction.channel?.id;
+  if (currentThreadId && flow.threadId && flow.threadId !== currentThreadId) {
+    await setFlow(uid, {
+      buyerAgreed: false,
+      buyerAddress: null,
+      threadId: currentThreadId,
+    });
+  }
+
+  const fresh = (await getFlow(uid)) || flow;
+
+  // Only block as 'already agreed' if we have a positive agreement with an address
+  if (fresh.buyerAgreed && fresh.buyerAddress) {
     await interaction.reply({
       content: "You already agreed.",
       flags: MessageFlags.Ephemeral,
@@ -238,7 +292,7 @@ async function handleAgreeBuyer(interaction) {
  */
 async function handleAgreeSeller(interaction) {
   const uid = interaction.user.id;
-  const flow = getFlow(uid);
+  const flow = await getFlow(uid);
   if (!flow) {
     await interaction.reply({
       content: "No active trade flow found.",
@@ -256,7 +310,20 @@ async function handleAgreeSeller(interaction) {
     });
     return;
   }
-  if (flow.sellerAgreed) {
+  // Guard against stale flow: ensure this agree action is for the current thread
+  const currentThreadId = interaction.channel?.id;
+  if (currentThreadId && flow.threadId && flow.threadId !== currentThreadId) {
+    await setFlow(uid, {
+      sellerAgreed: false,
+      sellerAddress: null,
+      threadId: currentThreadId,
+    });
+  }
+
+  const fresh = (await getFlow(uid)) || flow;
+
+  // Only block as 'already agreed' if we have a positive agreement with an address
+  if (fresh.sellerAgreed && fresh.sellerAddress) {
     await interaction.reply({
       content: "You already agreed.",
       flags: MessageFlags.Ephemeral,
@@ -271,7 +338,7 @@ async function handleAgreeSeller(interaction) {
  */
 async function handleMarkDelivered(interaction) {
   const uid = interaction.user.id;
-  const flow = getFlow(uid);
+  const flow = await getFlow(uid);
   if (!flow) {
     await interaction.reply({
       content: "No active trade flow found.",
@@ -329,7 +396,7 @@ async function handleMarkDelivered(interaction) {
       title: "Escrow Status",
       description: "Seller marked as Delivered.",
     });
-    const msgId = getFlow(uid)?.escrowStatusMessageId;
+    const msgId = (await getFlow(uid))?.escrowStatusMessageId;
     if (msgId) {
       try {
         const msg = await interaction.channel.messages.fetch(msgId);
@@ -359,7 +426,7 @@ async function handleMarkDelivered(interaction) {
  */
 async function handleApproveRelease(interaction) {
   const uid = interaction.user.id;
-  const flow = getFlow(uid);
+  const flow = await getFlow(uid);
   if (!flow) {
     await interaction.reply({
       content: "No active trade flow found.",
@@ -416,7 +483,7 @@ async function handleApproveRelease(interaction) {
       title: "Escrow Status",
       description: "Buyer approved delivery. Funds released.",
     });
-    const msgId = getFlow(uid)?.escrowStatusMessageId;
+    const msgId = (await getFlow(uid))?.escrowStatusMessageId;
     if (msgId) {
       try {
         const msg = await interaction.channel.messages.fetch(msgId);

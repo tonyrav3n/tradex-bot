@@ -11,7 +11,7 @@
  */
 
 import { MessageFlags } from "discord.js";
-import { getFlow, setFlow } from "../utils/flowState.js";
+import { getFlow, setFlow } from "../utils/flowRepo.js";
 import { buildDescriptionModal } from "../utils/components.js";
 
 /**

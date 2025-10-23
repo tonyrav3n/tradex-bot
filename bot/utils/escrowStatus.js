@@ -11,7 +11,8 @@
 
 import { getEscrowState, watchEscrowFunded } from "./escrow.js";
 import { buildEscrowStatusEmbed, buildActionsForStatus } from "./components.js";
-import { getFlow, setFlow } from "./flowState.js";
+import { getFlow, setFlow } from "./flowRepo.js";
+import { setStatusMessageId, markFunded } from "./escrowRepo.js";
 
 /**
  * Initialize status embed and start a funded watcher for an escrow.
@@ -68,7 +69,7 @@ export async function initEscrowStatusAndWatcher({
   let unwatch = null;
 
   // Compute buyer/seller Discord IDs from flow, unless explicitly overridden.
-  const flow = getFlow(uid) || {};
+  const flow = (await getFlow(uid)) || {};
   const buyerId =
     overrideBuyerId ??
     (flow.role === "buyer" ? uid : flow.counterpartyId) ??
@@ -104,9 +105,16 @@ export async function initEscrowStatusAndWatcher({
       messageId = statusMsg?.id ?? null;
 
       if (messageId) {
-        setFlow(uid, { escrowStatusMessageId: messageId });
+        await setFlow(uid, { escrowStatusMessageId: messageId });
         if (flow?.counterpartyId) {
-          setFlow(flow.counterpartyId, { escrowStatusMessageId: messageId });
+          await setFlow(flow.counterpartyId, {
+            escrowStatusMessageId: messageId,
+          });
+        }
+        try {
+          await setStatusMessageId(escrowAddress, messageId);
+        } catch (e) {
+          console.error("setStatusMessageId failed:", e);
         }
       }
     } else {
@@ -124,10 +132,10 @@ export async function initEscrowStatusAndWatcher({
     const alreadyStarted = Boolean(flow.escrowWatcherStarted);
     if (!alreadyStarted) {
       // Mark as started for both parties to avoid duplicate watchers
-      setFlow(uid, { escrowWatcherStarted: true });
-      const latest = getFlow(uid);
+      await setFlow(uid, { escrowWatcherStarted: true });
+      const latest = await getFlow(uid);
       if (latest?.counterpartyId) {
-        setFlow(latest.counterpartyId, { escrowWatcherStarted: true });
+        await setFlow(latest.counterpartyId, { escrowWatcherStarted: true });
       }
 
       unwatch = watchEscrowFunded(
@@ -136,6 +144,13 @@ export async function initEscrowStatusAndWatcher({
           try {
             // Fetch latest state after funding and update the embed
             const updated = await safeGetEscrowState(escrowAddress);
+            try {
+              await markFunded(escrowAddress, {
+                amountWei: updated?.amountWei,
+              });
+            } catch (e2) {
+              console.error("DB markFunded failed:", e2);
+            }
 
             const embed2 = buildEscrowStatusEmbed({
               escrowAddress,
@@ -148,8 +163,8 @@ export async function initEscrowStatusAndWatcher({
               description: updatedDescription,
             });
 
-            const currentMsgId =
-              getFlow(uid)?.escrowStatusMessageId ?? messageId;
+            const current = await getFlow(uid);
+            const currentMsgId = current?.escrowStatusMessageId ?? messageId;
             if (currentMsgId) {
               try {
                 const msg = await channel.messages.fetch(currentMsgId);

@@ -24,8 +24,16 @@
 
 import { createTrade } from "./createTrade.js";
 import { deriveEscrowAddressFromTx } from "./deriveEscrowAddress.js";
-import { getFlow, setFlow } from "./flowState.js";
+import { getFlow, setFlow } from "./flowRepo.js";
 import { initEscrowStatusAndWatcher } from "./escrowStatus.js";
+import {
+  recordEscrowCreation,
+  setEscrowDiscordContext,
+  setEscrowParties,
+  setStatusMessageId,
+  markFunded,
+} from "./escrowRepo.js";
+import { watchEscrowFunded } from "./escrow.js";
 
 /**
  * @typedef {Object} CreateAndAnnounceOptions
@@ -57,11 +65,15 @@ export async function createAndAnnounceTrade({
   initOptions,
 }) {
   if (!channel || typeof channel.send !== "function") {
-    throw new Error("createAndAnnounceTrade: 'channel' must be a channel-like object with send()");
+    throw new Error(
+      "createAndAnnounceTrade: 'channel' must be a channel-like object with send()",
+    );
   }
   if (!uid) throw new Error("createAndAnnounceTrade: 'uid' is required");
   if (!buyerAddress || !sellerAddress) {
-    throw new Error("createAndAnnounceTrade: 'buyerAddress' and 'sellerAddress' are required");
+    throw new Error(
+      "createAndAnnounceTrade: 'buyerAddress' and 'sellerAddress' are required",
+    );
   }
 
   let creatingMsg = null;
@@ -80,12 +92,69 @@ export async function createAndAnnounceTrade({
     // 3) Derive escrow address robustly from the tx
     escrowAddress = await deriveEscrowAddressFromTx(txHash);
 
-    // 4) Store escrow address in both sides' flow
+    // 4) Store escrow address in both sides' flow and persist in DB
     if (escrowAddress) {
-      setFlow(uid, { escrowAddress });
-      const flow2 = getFlow(uid);
+      await setFlow(uid, { escrowAddress });
+      const flow2 = await getFlow(uid);
       if (flow2?.counterpartyId) {
-        setFlow(flow2.counterpartyId, { escrowAddress });
+        await setFlow(flow2.counterpartyId, { escrowAddress });
+      }
+
+      // Persist creation in DB with Discord context and parties
+      const full = await getFlow(uid);
+      const isThread =
+        typeof channel?.isThread === "function"
+          ? channel.isThread()
+          : !!channel?.isThread;
+      const threadId = isThread ? (channel.id ?? null) : null;
+      const channelId = isThread
+        ? (channel.parentId ?? null)
+        : (channel.id ?? null);
+
+      const buyerDiscordId =
+        full?.buyerDiscordId ??
+        (full?.role === "buyer" ? uid : full?.counterpartyId) ??
+        null;
+      const sellerDiscordId =
+        full?.sellerDiscordId ??
+        (full?.role === "seller" ? uid : full?.counterpartyId) ??
+        null;
+
+      try {
+        await recordEscrowCreation({
+          escrowAddress,
+          factoryTxHash: txHash,
+          channelId,
+          threadId,
+          statusMessageId: null,
+          creatorUserId: uid,
+          buyerDiscordId,
+          sellerDiscordId,
+          buyerAddress: full?.buyerAddress ?? null,
+          sellerAddress: full?.sellerAddress ?? null,
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("DB recordEscrowCreation failed:", e);
+      }
+
+      // Lightweight DB watcher for 'Funded' to persist amount/status
+      try {
+        watchEscrowFunded(
+          escrowAddress,
+          async ({ amountWei }) => {
+            try {
+              await markFunded(escrowAddress, { amountWei });
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error("DB markFunded failed:", err);
+            }
+          },
+          { emitOnStart: true },
+        );
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to start DB funded watcher:", e);
       }
     }
 
@@ -97,7 +166,7 @@ export async function createAndAnnounceTrade({
     // 6) Initialize the status embed + watcher
     if (escrowAddress) {
       try {
-        await initEscrowStatusAndWatcher({
+        const { messageId } = await initEscrowStatusAndWatcher({
           channel,
           uid,
           escrowAddress,
@@ -108,13 +177,25 @@ export async function createAndAnnounceTrade({
               initOptions?.initialDescription ??
               "This will update automatically when the buyer funds the escrow.",
             updatedDescription:
-              initOptions?.updatedDescription ?? "Escrow status has been updated.",
+              initOptions?.updatedDescription ??
+              "Escrow status has been updated.",
           },
         });
+        if (messageId) {
+          try {
+            await setStatusMessageId(escrowAddress, messageId);
+          } catch (e2) {
+            // eslint-disable-next-line no-console
+            console.error("DB setStatusMessageId failed:", e2);
+          }
+        }
       } catch (e) {
         // Non-fatal: keep going even if init fails
         // eslint-disable-next-line no-console
-        console.error("createAndAnnounceTrade: failed to init status embed/watcher:", e);
+        console.error(
+          "createAndAnnounceTrade: failed to init status embed/watcher:",
+          e,
+        );
       }
     }
   } catch (e) {

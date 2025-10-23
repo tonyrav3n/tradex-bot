@@ -20,7 +20,7 @@ import {
   setPrice,
   setBuyerAddress,
   setSellerAddress,
-} from "../utils/flowState.js";
+} from "../utils/flowRepo.js";
 import {
   buildConfirmationEmbed,
   buildCreateThreadRow,
