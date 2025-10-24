@@ -379,8 +379,38 @@ async function handleMarkDelivered(interaction) {
       return;
     }
 
-    const txHash = await markEscrowDelivered(escrowAddress);
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    const { keyFor, checkCooldown, withLockThenCooldown } = await import(
+      "../utils/locks.js"
+    );
+    const rateKey = keyFor("mark_delivered", escrowAddress);
+    const cd = checkCooldown(rateKey);
+    if (!cd.ok) {
+      await interaction.reply({
+        content: `Action cooling down. Try again in ${Math.ceil(cd.remainingMs / 1000)}s.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    const res = await withLockThenCooldown(rateKey, 10000, 5000, async () => {
+      const tx = await markEscrowDelivered(escrowAddress);
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+      return tx;
+    });
+    if (!res.ok) {
+      if (res.remainingMs) {
+        await interaction.reply({
+          content: `Action already in progress. Try again in ${Math.ceil(res.remainingMs / 1000)}s.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.reply({
+          content: "Action could not start. Please try again shortly.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return;
+    }
+    const txHash = res.value;
     try {
       await dbMarkDelivered(escrowAddress);
     } catch (e) {
@@ -472,8 +502,38 @@ async function handleApproveRelease(interaction) {
       return;
     }
 
-    const txHash = await approveEscrowDelivery(escrowAddress);
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    const { keyFor, checkCooldown, withLockThenCooldown } = await import(
+      "../utils/locks.js"
+    );
+    const rateKey = keyFor("approve_release", escrowAddress);
+    const cd = checkCooldown(rateKey);
+    if (!cd.ok) {
+      await interaction.reply({
+        content: `Action cooling down. Try again in ${Math.ceil(cd.remainingMs / 1000)}s.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    const res = await withLockThenCooldown(rateKey, 10000, 5000, async () => {
+      const tx = await approveEscrowDelivery(escrowAddress);
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+      return tx;
+    });
+    if (!res.ok) {
+      if (res.remainingMs) {
+        await interaction.reply({
+          content: `Action already in progress. Try again in ${Math.ceil(res.remainingMs / 1000)}s.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.reply({
+          content: "Action could not start. Please try again shortly.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return;
+    }
+    const txHash = res.value;
     try {
       await dbMarkCompleted(escrowAddress);
     } catch (e) {
