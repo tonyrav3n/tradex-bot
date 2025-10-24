@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { query } from "../utils/db.js";
 
 export const data = new SlashCommandBuilder()
@@ -18,7 +18,7 @@ export async function execute(interaction) {
 
     // Check if the 'flows' table from migrations exists
     const resFlows = await query(
-      "SELECT to_regclass('public.flows') AS flows_table"
+      "SELECT to_regclass('public.flows') AS flows_table",
     );
     const flowsTable = resFlows?.rows?.[0]?.flows_table || null;
     flowsOk = Boolean(flowsTable);
@@ -43,7 +43,7 @@ export async function execute(interaction) {
   try {
     await interaction.reply({
       content: "Healthcheck\n```\n" + content + "\n```",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   } catch {
     // If the interaction was already acknowledged differently, try edit

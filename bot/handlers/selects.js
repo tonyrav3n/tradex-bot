@@ -37,17 +37,25 @@ async function handleSelectCounterparty(_client, interaction) {
   const [counterpartyId] = interaction.values;
 
   // Update the initiator's flow with the counterparty and preserve the original token
-  setFlow(uid, {
+  const existing = await getFlow(uid);
+  await setFlow(uid, {
     counterpartyId,
+    buyerAgreed: false,
+    sellerAgreed: false,
     originalInteractionToken:
-      getFlow(uid)?.originalInteractionToken || interaction.token,
+      (existing && existing.originalInteractionToken) || interaction.token,
   });
 
   // Mirror role for the counterparty based on initiator's role
-  const initiatorFlow = getFlow(uid) || {};
+  const initiatorFlow = (await getFlow(uid)) || {};
   const oppRole = initiatorFlow.role === "buyer" ? "seller" : "buyer";
 
-  setFlow(counterpartyId, { role: oppRole, counterpartyId: uid });
+  await setFlow(counterpartyId, {
+    role: oppRole,
+    counterpartyId: uid,
+    buyerAgreed: false,
+    sellerAgreed: false,
+  });
 
   // Prompt for trade description
   const modal = buildDescriptionModal();

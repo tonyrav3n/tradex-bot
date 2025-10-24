@@ -28,6 +28,7 @@ import {
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { createAndAnnounceTrade } from "../utils/tradeFlow.js";
+import { normalizeAndValidateAddress } from "../utils/validation.js";
 import { initEscrowStatusAndWatcher } from "../utils/escrowStatus.js";
 
 /**
@@ -41,22 +42,23 @@ async function handleTradeDescriptionModal(client, interaction) {
   const description = interaction.fields.getTextInputValue("trade_description");
   const priceUsd = interaction.fields.getTextInputValue("trade_price_usd");
 
-  // Store description for both sides
-  setFlow(uid, {
+  // Store description for both sides (DB-backed, await writes/reads)
+  const existing = await getFlow(uid);
+  await setFlow(uid, {
     description,
     originalInteractionToken:
-      getFlow(uid)?.originalInteractionToken || interaction.token,
+      (existing && existing.originalInteractionToken) || interaction.token,
   });
-  setPrice(uid, priceUsd);
+  await setPrice(uid, priceUsd);
 
-  const flow = getFlow(uid);
+  const flow = await getFlow(uid);
   if (flow?.counterpartyId) {
-    setFlow(flow.counterpartyId, { description });
-    setPrice(flow.counterpartyId, priceUsd);
+    await setFlow(flow.counterpartyId, { description });
+    await setPrice(flow.counterpartyId, priceUsd);
   }
 
-  const buyerId = flow.role === "buyer" ? uid : flow.counterpartyId;
-  const sellerId = flow.role === "seller" ? uid : flow.counterpartyId;
+  const buyerId = flow?.role === "buyer" ? uid : flow?.counterpartyId || uid;
+  const sellerId = flow?.role === "seller" ? uid : flow?.counterpartyId || uid;
 
   const embed = buildConfirmationEmbed({
     buyerId,
@@ -116,7 +118,7 @@ async function handleBuyerAddressModal(client, interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   // Verify the submitter is the locked buyer
-  const fcheck = getFlow(uid);
+  const fcheck = await getFlow(uid);
   const lockedBuyerId =
     fcheck?.buyerDiscordId ??
     (fcheck?.role === "buyer" ? uid : fcheck?.counterpartyId);
@@ -127,23 +129,28 @@ async function handleBuyerAddressModal(client, interaction) {
     return;
   }
 
-  const addr = interaction.fields.getTextInputValue("buyer_address");
-  setBuyerAddress(uid, addr);
+  const rawBuyer = interaction.fields.getTextInputValue("buyer_address");
+  const vBuyer = await normalizeAndValidateAddress(rawBuyer);
+  if (!vBuyer.ok) {
+    await interaction.editReply({ content: vBuyer.error });
+    return;
+  }
+  await setBuyerAddress(uid, vBuyer.address);
 
-  const flow = getFlow(uid);
+  const flow = await getFlow(uid);
   if (flow?.counterpartyId) {
-    setBuyerAddress(flow.counterpartyId, addr);
+    await setBuyerAddress(flow.counterpartyId, vBuyer.address);
   }
 
   // Mark buyer agreed for both sides
-  setFlow(uid, { buyerAgreed: true });
+  await setFlow(uid, { buyerAgreed: true });
   if (flow?.counterpartyId) {
-    setFlow(flow.counterpartyId, { buyerAgreed: true });
+    await setFlow(flow.counterpartyId, { buyerAgreed: true });
   }
 
   // Update the agree row UI state
   {
-    const updated = getFlow(uid);
+    const updated = await getFlow(uid);
     if (updated?.agreeMessageId) {
       try {
         const msg = await interaction.channel.messages.fetch(
@@ -163,7 +170,7 @@ async function handleBuyerAddressModal(client, interaction) {
     }
   }
 
-  const f = getFlow(uid);
+  const f = await getFlow(uid);
   // If both parties agreed and provided addresses, create the trade
   if (
     f?.buyerAgreed &&
@@ -171,6 +178,16 @@ async function handleBuyerAddressModal(client, interaction) {
     f?.buyerAddress &&
     f?.sellerAddress
   ) {
+    // Prevent identical buyer/seller addresses
+    if (
+      String(f.buyerAddress).toLowerCase() ===
+      String(f.sellerAddress).toLowerCase()
+    ) {
+      await interaction.channel.send({
+        content: "Buyer and Seller addresses must be different.",
+      });
+      return;
+    }
     try {
       await createAndAnnounceTrade({
         channel: interaction.channel,
@@ -209,7 +226,7 @@ async function handleSellerAddressModal(client, interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   // Verify the submitter is the locked seller
-  const fcheck = getFlow(uid);
+  const fcheck = await getFlow(uid);
   const lockedSellerId =
     fcheck?.sellerDiscordId ??
     (fcheck?.role === "seller" ? uid : fcheck?.counterpartyId);
@@ -220,23 +237,28 @@ async function handleSellerAddressModal(client, interaction) {
     return;
   }
 
-  const addr = interaction.fields.getTextInputValue("seller_address");
-  setSellerAddress(uid, addr);
+  const rawSeller = interaction.fields.getTextInputValue("seller_address");
+  const vSeller = await normalizeAndValidateAddress(rawSeller);
+  if (!vSeller.ok) {
+    await interaction.editReply({ content: vSeller.error });
+    return;
+  }
+  await setSellerAddress(uid, vSeller.address);
 
-  const flow = getFlow(uid);
+  const flow = await getFlow(uid);
   if (flow?.counterpartyId) {
-    setSellerAddress(flow.counterpartyId, addr);
+    await setSellerAddress(flow.counterpartyId, vSeller.address);
   }
 
   // Mark seller agreed for both sides
-  setFlow(uid, { sellerAgreed: true });
+  await setFlow(uid, { sellerAgreed: true });
   if (flow?.counterpartyId) {
-    setFlow(flow.counterpartyId, { sellerAgreed: true });
+    await setFlow(flow.counterpartyId, { sellerAgreed: true });
   }
 
   // Update the agree row UI state
   {
-    const updated = getFlow(uid);
+    const updated = await getFlow(uid);
     if (updated?.agreeMessageId) {
       try {
         const msg = await interaction.channel.messages.fetch(
@@ -256,7 +278,7 @@ async function handleSellerAddressModal(client, interaction) {
     }
   }
 
-  const f = getFlow(uid);
+  const f = await getFlow(uid);
   // If both parties agreed and provided addresses, create the trade
   if (
     f?.buyerAgreed &&
@@ -264,6 +286,16 @@ async function handleSellerAddressModal(client, interaction) {
     f?.buyerAddress &&
     f?.sellerAddress
   ) {
+    // Prevent identical buyer/seller addresses
+    if (
+      String(f.buyerAddress).toLowerCase() ===
+      String(f.sellerAddress).toLowerCase()
+    ) {
+      await interaction.channel.send({
+        content: "Buyer and Seller addresses must be different.",
+      });
+      return;
+    }
     try {
       await createAndAnnounceTrade({
         channel: interaction.channel,

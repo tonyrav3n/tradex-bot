@@ -37,6 +37,10 @@ import {
   approveEscrowDelivery,
 } from "../utils/escrow.js";
 import { deriveEscrowAddressFromTx } from "../utils/deriveEscrowAddress.js";
+import {
+  markDelivered as dbMarkDelivered,
+  markCompleted as dbMarkCompleted,
+} from "../utils/escrowRepo.js";
 
 /**
  * Safely defer a reply if not already deferred/replied.
@@ -377,6 +381,12 @@ async function handleMarkDelivered(interaction) {
 
     const txHash = await markEscrowDelivered(escrowAddress);
     await publicClient.waitForTransactionReceipt({ hash: txHash });
+    try {
+      await dbMarkDelivered(escrowAddress);
+    } catch (e) {
+      // non-fatal DB persistence failure
+      console.error("DB persist delivered failed:", e);
+    }
 
     const updated = await getEscrowState(escrowAddress);
     const buyerId2 =
@@ -464,6 +474,12 @@ async function handleApproveRelease(interaction) {
 
     const txHash = await approveEscrowDelivery(escrowAddress);
     await publicClient.waitForTransactionReceipt({ hash: txHash });
+    try {
+      await dbMarkCompleted(escrowAddress);
+    } catch (e) {
+      // non-fatal DB persistence failure
+      console.error("DB persist completed failed:", e);
+    }
 
     const updated = await getEscrowState(escrowAddress);
     const buyerId2 =
