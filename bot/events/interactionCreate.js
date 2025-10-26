@@ -8,7 +8,6 @@ export const once = false;
 
 export async function execute(client, interaction) {
   try {
-    // Slash commands
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
@@ -16,19 +15,16 @@ export async function execute(client, interaction) {
       return;
     }
 
-    // Buttons
     if (interaction.isButton && interaction.isButton()) {
       await handleButton(client, interaction);
       return;
     }
 
-    // Modals
     if (interaction.isModalSubmit && interaction.isModalSubmit()) {
       await handleModal(client, interaction);
       return;
     }
 
-    // User selects
     if (
       typeof interaction.isUserSelectMenu === "function" &&
       interaction.isUserSelectMenu()
@@ -37,10 +33,6 @@ export async function execute(client, interaction) {
       return;
     }
   } catch (err) {
-    // Centralized error handling for any interaction path
-    // Prefer editing if already deferred; otherwise send ephemeral reply.
-    // Avoid throwing to keep the client stable.
-    // eslint-disable-next-line no-console
     console.error("Interaction error:", err);
 
     try {

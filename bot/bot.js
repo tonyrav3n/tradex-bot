@@ -23,22 +23,39 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.commands = new Collection();
 
 // Load all commands from /commands
-const commandsPath = path.join(process.cwd(), "bot/commands");
-for (const file of fs.readdirSync(commandsPath)) {
-  if (!file.endsWith(".js")) continue;
-  const command = await import(`./commands/${file}`);
-  client.commands.set(command.data.name, command);
+const commandsDir = path.join(process.cwd(), "bot", "commands");
+const commandFiles = fs
+  .readdirSync(commandsDir)
+  .filter((f) => f.endsWith(".js"));
+
+for (const file of commandFiles) {
+  const mod = await import(`./commands/${file}`);
+
+  const name = mod?.data?.name;
+  if (!name) {
+    console.warn(`Skipping ${file}: missing export 'data.name'`);
+    continue;
+  }
+
+  client.commands.set(name, mod);
 }
 
 // Load all events from /events
-const eventsPath = path.join(process.cwd(), "bot/events");
-for (const file of fs.readdirSync(eventsPath)) {
-  if (!file.endsWith(".js")) continue;
-  const event = await import(`./events/${file}`);
-  if (event.once) {
-    client.once(event.name, (...args) => event.execute(client, ...args));
+const eventDir = path.join(process.cwd(), "bot", "events");
+const eventFiles = fs.readdirSync(eventDir).filter((f) => f.endsWith(".js"));
+for (const file of eventFiles) {
+  const mod = await import(`./events/${file}`);
+
+  const name = mod?.name;
+  if (!name) {
+    console.warn(`Skipping ${file}: missing export 'name'`);
+    continue;
+  }
+
+  if (mod.once) {
+    client.once(name, (...args) => mod.execute(client, ...args));
   } else {
-    client.on(event.name, (...args) => event.execute(client, ...args));
+    client.on(name, (...args) => mod.execute(client, ...args));
   }
 }
 

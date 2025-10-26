@@ -9,17 +9,21 @@ import {
   EmbedBuilder,
 } from "discord.js";
 
-export function buildTradeButtonsRow() {
+export function buildTradeButton() {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("create_trade_button")
-      .setLabel("Demo Trx")
-      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("create_trade_flow_button")
       .setLabel("Create Trade")
       .setStyle(ButtonStyle.Success),
   );
+}
+
+export function buildTradeEmbed() {
+  return new EmbedBuilder()
+    .setColor("#5865F2")
+    .setTitle("🪙 TradeX")
+    .setDescription("Ready to begin?\nClick below to create a trade.")
+    .setFooter({ text: "Built for trustless digital trading." });
 }
 
 export function buildRoleButtonsRow() {
@@ -101,7 +105,7 @@ export function buildCreatedEmbed({ buyerId, sellerId, description }) {
       { name: "Item", value: description, inline: false },
     )
     .setFooter({ text: "Confirm to continue securely." })
-    .setColor(0x2ecc71);
+    .setColor("#2ecc71");
 }
 
 export function buildCreateThreadRow() {
