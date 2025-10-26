@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 
-import { buildTradeButton, buildTradeEmbed } from "../utils/components";
+import { buildTradeButton, buildTradeEmbed } from "../utils/components.js";
 
 export const data = new SlashCommandBuilder()
   .setName("create_trade")
