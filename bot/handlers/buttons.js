@@ -221,6 +221,7 @@ async function handleCreateThread(client, interaction) {
   const payload = {
     content: `Head to the thread → <#${thread.id}> to proceed with your trade.`,
     components: [],
+    embeds: [],
   };
 
   if (originalToken && appId) {
