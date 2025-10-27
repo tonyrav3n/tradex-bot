@@ -218,18 +218,15 @@ async function handleCreateThread(client, interaction) {
   const originalToken = flow?.originalInteractionToken;
   const appId = client?.application?.id;
 
-  const content = `Head to the thread → <#${thread.id}> to proceed with your trade.`;
+  const payload = {
+    content: `Head to the thread → <#${thread.id}> to proceed with your trade.`,
+    components: [],
+  };
 
   if (originalToken && appId) {
-    await updateEphemeralOriginal(appId, originalToken, {
-      content: content,
-      components: [],
-    });
+    await updateEphemeralOriginal(appId, originalToken, payload);
   } else {
-    await interaction.editReply({
-      content: content,
-      components: [],
-    });
+    await interaction.editReply(payload);
   }
 }
 

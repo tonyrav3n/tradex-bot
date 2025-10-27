@@ -74,7 +74,7 @@ async function handleTradeDescriptionModal(client, interaction) {
   const row = buildCreateThreadRow();
 
   const appId = client?.application?.id;
-  const responsePayload = {
+  const payload = {
     content: "Review the details and proceed to invite the counterparty.",
     embeds: [embed],
     components: [row],
@@ -83,10 +83,10 @@ async function handleTradeDescriptionModal(client, interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   if (originalToken && appId) {
-    await updateEphemeralOriginal(appId, originalToken, responsePayload);
+    await updateEphemeralOriginal(appId, originalToken, payload);
     await interaction.deleteReply();
   } else {
-    await interaction.editReply(responsePayload);
+    await interaction.editReply(payload);
   }
 }
 
