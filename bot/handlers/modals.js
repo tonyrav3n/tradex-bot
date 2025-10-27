@@ -1,18 +1,3 @@
-/**
- * Modal interaction handlers extracted from the monolithic interactionCreate.js.
- *
- * Handles:
- * - trade_description_modal
- * - buyer_address_modal
- * - seller_address_modal
- *
- * Responsibilities:
- * - Maintain flow state symmetry for both parties
- * - Update ephemeral originals when available
- * - Create trades when both parties agreed and provided addresses
- * - Initialize escrow status embed and event watcher
- */
-
 import { MessageFlags } from "discord.js";
 import {
   getFlow,
@@ -29,25 +14,20 @@ import {
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { createAndAnnounceTrade } from "../utils/tradeFlow.js";
 import { normalizeAndValidateAddress } from "../utils/validation.js";
-import { initEscrowStatusAndWatcher } from "../utils/escrowStatus.js";
 
-/**
- * trade_description_modal
- * - Captures item description and price (USD)
- * - Builds confirmation embed with buyer/seller derived from role
- * - Updates the original ephemeral message if possible
- */
 async function handleTradeDescriptionModal(client, interaction) {
   const uid = interaction.user.id;
   const description = interaction.fields.getTextInputValue("trade_description");
   const priceUsd = interaction.fields.getTextInputValue("trade_price_usd");
 
-  // Store description for both sides (DB-backed, await writes/reads)
-  const existing = await getFlow(uid);
+  // Store description for both sides
+  const existingFlow = await getFlow(uid);
+  const originalToken =
+    existingFlow?.originalInteractionToken || interaction.token;
+
   await setFlow(uid, {
     description,
-    originalInteractionToken:
-      (existing && existing.originalInteractionToken) || interaction.token,
+    originalInteractionToken: originalToken,
   });
   await setPrice(uid, priceUsd);
 
@@ -66,53 +46,25 @@ async function handleTradeDescriptionModal(client, interaction) {
     description,
     priceUsd,
   });
-
   const row = buildCreateThreadRow();
 
-  // Update the original ephemeral message when possible
-  const originalToken = flow?.originalInteractionToken;
   const appId = client?.application?.id;
+  const responsePayload = {
+    content: "Review the details and proceed to invite the counterparty.",
+    embeds: [embed],
+    components: [row],
+  };
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   if (originalToken && appId) {
-    await updateEphemeralOriginal(appId, originalToken, {
-      content: "Review the details and proceed to invite the counterparty.",
-      embeds: [embed],
-      components: [row],
-    });
-    // Create and immediately clean up a placeholder ephemeral reply to satisfy Discord's modal response requirement.
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await updateEphemeralOriginal(appId, originalToken, responsePayload);
     await interaction.deleteReply();
   } else {
-    // Fallback: update via the current interaction's ephemeral reply
-    if (flow?.originalInteractionToken && client?.application?.id) {
-      await updateEphemeralOriginal(
-        client.application.id,
-        flow.originalInteractionToken,
-        {
-          content: "Review the details and proceed to invite the counterparty.",
-          embeds: [embed],
-          components: [row],
-        },
-      );
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      await interaction.deleteReply();
-    } else {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      await interaction.editReply({
-        content: "Review the details and proceed to invite the counterparty.",
-        embeds: [embed],
-        components: [row],
-      });
-    }
+    await interaction.editReply(responsePayload);
   }
 }
 
-/**
- * buyer_address_modal
- * - Captures buyer address, marks buyerAgreed
- * - When both parties have agreed and provided addresses, creates the escrow
- * - Initializes escrow status embed and watcher
- */
 async function handleBuyerAddressModal(client, interaction) {
   const uid = interaction.user.id;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -215,12 +167,6 @@ async function handleBuyerAddressModal(client, interaction) {
   });
 }
 
-/**
- * seller_address_modal
- * - Captures seller address, marks sellerAgreed
- * - When both parties have agreed and provided addresses, creates the escrow
- * - Initializes escrow status embed and watcher
- */
 async function handleSellerAddressModal(client, interaction) {
   const uid = interaction.user.id;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -323,11 +269,6 @@ async function handleSellerAddressModal(client, interaction) {
   });
 }
 
-/**
- * Main modal dispatcher to be used by the top-level interaction handler.
- * @param {import('discord.js').Client} client
- * @param {import('discord.js').ModalSubmitInteraction} interaction
- */
 export async function handleModal(client, interaction) {
   const id = interaction.customId;
 
