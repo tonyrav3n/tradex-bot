@@ -17,8 +17,13 @@
  */
 
 import { MessageFlags, ChannelType } from "discord.js";
-import { createTrade } from "../utils/createTrade.js";
+
 import { startFlow, setFlow, getFlow } from "../utils/flowRepo.js";
+import {
+  resolveLockedRoles,
+  assertBuyer,
+  assertSeller,
+} from "../utils/roles.js";
 import {
   buildRoleButtonsRow,
   buildCounterpartySelectRow,
@@ -36,46 +41,26 @@ import {
   markEscrowDelivered,
   approveEscrowDelivery,
 } from "../utils/escrow.js";
-import { deriveEscrowAddressFromTx } from "../utils/deriveEscrowAddress.js";
 import {
   markDelivered as dbMarkDelivered,
   markCompleted as dbMarkCompleted,
 } from "../utils/escrowRepo.js";
 
 /**
- * Safely defer a reply if not already deferred/replied.
- * @param {import('discord.js').ButtonInteraction} interaction
- * @param {object} options
+ * Update the escrow status message if known, with the provided embed and action components
+ * based on the updated status value or text.
  */
-async function safeDeferReply(
-  interaction,
-  options = { flags: MessageFlags.Ephemeral },
-) {
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply(options);
-  }
-}
-
-/**
- * Handle "create_trade_button" demo flow:
- * - Creates a demo trade with hardcoded buyer/seller and amount.
- */
-async function handleDemoCreate(interaction) {
-  await safeDeferReply(interaction, { flags: MessageFlags.Ephemeral });
-
-  const buyer = "0x8748B8d799754DA4bD9B5640e444b59E957F8f8E";
-  const seller = "0xe3378EE2b08284f5ac0c2695d4029E1C444beE6F";
-  const amount = "0.001";
-
+async function updateEscrowStatusMessage(interaction, uid, embed, updated) {
+  const msgId = (await getFlow(uid))?.escrowStatusMessageId;
+  if (!msgId) return;
   try {
-    const txHash = await createTrade(buyer, seller, amount);
-    await interaction.editReply({
-      content: `✅ Trade successfully created!\n\nTransaction hash: ${txHash}`,
+    const msg = await interaction.channel.messages.fetch(msgId);
+    await msg.edit({
+      embeds: [embed],
+      components: buildActionsForStatus(updated.status ?? updated.statusText),
     });
-  } catch (err) {
-    await interaction.editReply({
-      content: `❌ Failed to create trade:\n${err.message}`,
-    });
+  } catch (e) {
+    console.error("Failed to update escrow status message:", e);
   }
 }
 
@@ -88,7 +73,7 @@ async function handleStartFlow(client, interaction) {
   await startFlow(uid);
   await setFlow(uid, { originalInteractionToken: interaction.token });
 
-  await safeDeferReply(interaction, { flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   await interaction.editReply({
     content: "What is your role in this trade?",
     components: [buildRoleButtonsRow()],
@@ -259,11 +244,10 @@ async function handleAgreeBuyer(interaction) {
     });
     return;
   }
-  const buyerId =
-    flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
-  if (uid !== buyerId) {
+  const check = assertBuyer(uid, flow);
+  if (!check.ok) {
     await interaction.reply({
-      content: "You are not the buyer for this trade.",
+      content: check.message,
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -350,12 +334,10 @@ async function handleMarkDelivered(interaction) {
     });
     return;
   }
-  const sellerId =
-    flow.sellerDiscordId ??
-    (flow.role === "seller" ? uid : flow.counterpartyId);
-  if (uid !== sellerId) {
+  const check = assertSeller(uid, flow);
+  if (!check.ok) {
     await interaction.reply({
-      content: "You are not the seller for this trade.",
+      content: check.message,
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -419,12 +401,10 @@ async function handleMarkDelivered(interaction) {
     }
 
     const updated = await getEscrowState(escrowAddress);
-    const buyerId2 =
-      flow.buyerDiscordId ??
-      (flow.role === "buyer" ? uid : flow.counterpartyId);
-    const sellerId2 =
-      flow.sellerDiscordId ??
-      (flow.role === "seller" ? uid : flow.counterpartyId);
+    const { buyerId: buyerId2, sellerId: sellerId2 } = resolveLockedRoles(
+      flow,
+      uid,
+    );
 
     const embed2 = buildEscrowStatusEmbed({
       escrowAddress,
@@ -436,18 +416,7 @@ async function handleMarkDelivered(interaction) {
       title: "Escrow Status",
       description: "Seller marked as Delivered.",
     });
-    const msgId = (await getFlow(uid))?.escrowStatusMessageId;
-    if (msgId) {
-      try {
-        const msg = await interaction.channel.messages.fetch(msgId);
-        await msg.edit({
-          embeds: [embed2],
-          components: buildActionsForStatus(
-            updated.status ?? updated.statusText,
-          ),
-        });
-      } catch {}
-    }
+    await updateEscrowStatusMessage(interaction, uid, embed2, updated);
 
     await interaction.reply({
       content: `✅ Marked delivered. Tx: ${txHash}`,
@@ -542,12 +511,10 @@ async function handleApproveRelease(interaction) {
     }
 
     const updated = await getEscrowState(escrowAddress);
-    const buyerId2 =
-      flow.buyerDiscordId ??
-      (flow.role === "buyer" ? uid : flow.counterpartyId);
-    const sellerId2 =
-      flow.sellerDiscordId ??
-      (flow.role === "seller" ? uid : flow.counterpartyId);
+    const { buyerId: buyerId2, sellerId: sellerId2 } = resolveLockedRoles(
+      flow,
+      uid,
+    );
 
     const embed2 = buildEscrowStatusEmbed({
       escrowAddress,
@@ -559,18 +526,7 @@ async function handleApproveRelease(interaction) {
       title: "Escrow Status",
       description: "Buyer approved delivery. Funds released.",
     });
-    const msgId = (await getFlow(uid))?.escrowStatusMessageId;
-    if (msgId) {
-      try {
-        const msg = await interaction.channel.messages.fetch(msgId);
-        await msg.edit({
-          embeds: [embed2],
-          components: buildActionsForStatus(
-            updated.status ?? updated.statusText,
-          ),
-        });
-      } catch {}
-    }
+    await updateEscrowStatusMessage(interaction, uid, embed2, updated);
 
     await interaction.reply({
       content: `✅ Approved and released. Tx: ${txHash}`,
@@ -594,8 +550,6 @@ export async function handleButton(client, interaction) {
 
   try {
     switch (id) {
-      case "create_trade_button":
-        return handleDemoCreate(interaction);
       case "create_trade_flow_button":
         return handleStartFlow(client, interaction);
       case "role_buyer":
@@ -623,14 +577,18 @@ export async function handleButton(client, interaction) {
         await interaction.editReply({
           content: `There was an error handling your button: ${err.message}`,
         });
-      } catch {}
+      } catch (e) {
+        console.error("Failed to edit button error reply:", e);
+      }
     } else if (!interaction.replied && !interaction.deferred) {
       try {
         await interaction.reply({
           content: `There was an error handling your button: ${err.message}`,
           flags: MessageFlags.Ephemeral,
         });
-      } catch {}
+      } catch (e) {
+        console.error("Failed to send button error reply:", e);
+      }
     }
   }
 }

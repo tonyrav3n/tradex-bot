@@ -264,7 +264,9 @@ export function watchEscrowFunded(escrowAddress, handler, options = {}) {
   return () => {
     try {
       if (typeof unwatch === "function") unwatch();
-    } catch {}
+    } catch (e) {
+      console.error("Escrow unwatch cleanup failed:", e);
+    }
   };
 }
 
@@ -276,7 +278,7 @@ export async function waitForFunded(escrowAddress, options = {}) {
   const intervalMs = options.intervalMs ?? 4000; // 4 seconds
 
   const start = Date.now();
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     try {
       const [status, amountWei] = await Promise.all([

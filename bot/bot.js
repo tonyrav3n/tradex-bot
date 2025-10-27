@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 
-import { Client, GatewayIntentBits, Collection, Events } from "discord.js";
+import { Client, GatewayIntentBits, Collection } from "discord.js";
 import { initDb } from "./utils/db.js";
 
 dotenv.config();

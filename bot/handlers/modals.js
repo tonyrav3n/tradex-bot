@@ -1,3 +1,17 @@
+/**
+ * Modal interaction handlers for TradeNest.
+ *
+ * Handles modal submissions:
+ * - trade_description_modal
+ * - buyer_address_modal
+ * - seller_address_modal
+ *
+ * Responsibilities:
+ * - Persist and sync flow state for both parties
+ * - Validate addresses and enforce correct roles
+ * - Update ephemeral/original messages (embeds, components)
+ * - Kick off trade creation when both parties are ready
+ */
 import { MessageFlags } from "discord.js";
 import {
   getFlow,
@@ -14,7 +28,19 @@ import {
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { createAndAnnounceTrade } from "../utils/tradeFlow.js";
 import { normalizeAndValidateAddress } from "../utils/validation.js";
+import {
+  resolveLockedRoles,
+  assertBuyer,
+  assertSeller,
+} from "../utils/roles.js";
 
+/**
+ * Handle trade_description_modal submission.
+ * - Stores description and price for both users
+ * - Builds confirmation embed and actions
+ * - Edits the original ephemeral message when possible
+ * - Uses defer+delete to acknowledge the modal quickly
+ */
 async function handleTradeDescriptionModal(client, interaction) {
   const uid = interaction.user.id;
   const description = interaction.fields.getTextInputValue("trade_description");
@@ -37,8 +63,7 @@ async function handleTradeDescriptionModal(client, interaction) {
     await setPrice(flow.counterpartyId, priceUsd);
   }
 
-  const buyerId = flow?.role === "buyer" ? uid : flow?.counterpartyId || uid;
-  const sellerId = flow?.role === "seller" ? uid : flow?.counterpartyId || uid;
+  const { buyerId, sellerId } = resolveLockedRoles(flow, uid);
 
   const embed = buildConfirmationEmbed({
     buyerId,
@@ -65,18 +90,23 @@ async function handleTradeDescriptionModal(client, interaction) {
   }
 }
 
+/**
+ * Handle buyer_address_modal submission.
+ * - Verifies the submitter is the buyer
+ * - Normalizes/validates the address
+ * - Marks buyerAgreed and updates buttons
+ * - Triggers trade creation if both parties are ready
+ */
 async function handleBuyerAddressModal(client, interaction) {
   const uid = interaction.user.id;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  // Verify the submitter is the locked buyer
+  // Verify the submitter is the buyer (locked or derived)
   const fcheck = await getFlow(uid);
-  const lockedBuyerId =
-    fcheck?.buyerDiscordId ??
-    (fcheck?.role === "buyer" ? uid : fcheck?.counterpartyId);
-  if (uid !== lockedBuyerId) {
+  const checkBuyer = assertBuyer(uid, fcheck);
+  if (!checkBuyer.ok) {
     await interaction.editReply({
-      content: "You are not the buyer for this trade.",
+      content: checkBuyer.message,
     });
     return;
   }
@@ -167,18 +197,23 @@ async function handleBuyerAddressModal(client, interaction) {
   });
 }
 
+/**
+ * Handle seller_address_modal submission.
+ * - Verifies the submitter is the seller
+ * - Normalizes/validates the address
+ * - Marks sellerAgreed and updates buttons
+ * - Triggers trade creation if both parties are ready
+ */
 async function handleSellerAddressModal(client, interaction) {
   const uid = interaction.user.id;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  // Verify the submitter is the locked seller
+  // Verify the submitter is the seller (locked or derived)
   const fcheck = await getFlow(uid);
-  const lockedSellerId =
-    fcheck?.sellerDiscordId ??
-    (fcheck?.role === "seller" ? uid : fcheck?.counterpartyId);
-  if (uid !== lockedSellerId) {
+  const checkSeller = assertSeller(uid, fcheck);
+  if (!checkSeller.ok) {
     await interaction.editReply({
-      content: "You are not the seller for this trade.",
+      content: checkSeller.message,
     });
     return;
   }
@@ -269,6 +304,12 @@ async function handleSellerAddressModal(client, interaction) {
   });
 }
 
+/**
+ * Modal dispatcher: routes by interaction.customId and provides
+ * best-effort error responses without throwing.
+ * @param {import('discord.js').Client} client
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ */
 export async function handleModal(client, interaction) {
   const id = interaction.customId;
 
@@ -290,14 +331,18 @@ export async function handleModal(client, interaction) {
         await interaction.editReply({
           content: `There was an error handling your submission: ${err.message}`,
         });
-      } catch {}
+      } catch (e) {
+        console.error("Failed to edit modal error reply:", e);
+      }
     } else if (!interaction.replied && !interaction.deferred) {
       try {
         await interaction.reply({
           content: `There was an error handling your submission: ${err.message}`,
           flags: MessageFlags.Ephemeral,
         });
-      } catch {}
+      } catch (e) {
+        console.error("Failed to send modal error reply:", e);
+      }
     }
   }
 }

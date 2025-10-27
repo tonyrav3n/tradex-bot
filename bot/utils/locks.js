@@ -100,7 +100,11 @@ export function tryAcquireLock(key, ttlMs = 10_000) {
   const t = nowMs();
   const current = locks.get(key);
 
-  if (current && typeof current.expiresAt === "number" && current.expiresAt > t) {
+  if (
+    current &&
+    typeof current.expiresAt === "number" &&
+    current.expiresAt > t
+  ) {
     const remainingMs = current.expiresAt - t;
     return { ok: false, remainingMs, reason: "locked" };
   }
@@ -202,7 +206,7 @@ export async function withCooldown(key, cooldownMs, fn) {
   try {
     const value = await fn();
     return { ok: true, value };
-  } catch (error) {
+  } catch {
     // Optionally: clear cooldown on error (policy-dependent).
     // For now, keep cooldown to avoid spamming.
     return { ok: false, remainingMs: getRemainingCooldown(key) };

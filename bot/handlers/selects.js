@@ -30,7 +30,9 @@ async function handleSelectCounterparty(_client, interaction) {
         content: "Please select a counterparty.",
         flags: MessageFlags.Ephemeral,
       });
-    } catch {}
+    } catch (e) {
+      console.error("Failed to prompt for counterparty selection:", e);
+    }
     return;
   }
 
@@ -83,14 +85,18 @@ export async function handleSelect(client, interaction) {
         await interaction.editReply({
           content: `There was an error handling your selection: ${err.message}`,
         });
-      } catch {}
+      } catch (e) {
+        console.error("Failed to edit selection error reply:", e);
+      }
     } else if (!interaction.replied && !interaction.deferred) {
       try {
         await interaction.reply({
           content: `There was an error handling your selection: ${err.message}`,
           flags: MessageFlags.Ephemeral,
         });
-      } catch {}
+      } catch (e) {
+        console.error("Failed to send selection error reply:", e);
+      }
     }
   }
 }
