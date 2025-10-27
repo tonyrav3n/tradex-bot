@@ -18,7 +18,7 @@
 
 import { MessageFlags, ChannelType } from "discord.js";
 
-import { startFlow, setFlow, getFlow } from "../utils/flowRepo.js";
+import { startFlow, setFlow, getFlow, clearFlow } from "../utils/flowRepo.js";
 import {
   resolveLockedRoles,
   assertBuyer,
@@ -217,14 +217,17 @@ async function handleCreateThread(client, interaction) {
 
   const originalToken = flow?.originalInteractionToken;
   const appId = client?.application?.id;
+
+  const content = `Head to the thread → <#${thread.id}> to proceed with your trade.`;
+
   if (originalToken && appId) {
     await updateEphemeralOriginal(appId, originalToken, {
-      content: `✅ Private thread created: <#${thread.id}>`,
+      content: content,
       components: [],
     });
   } else {
     await interaction.editReply({
-      content: `✅ Private thread created: <#${thread.id}>`,
+      content: content,
       components: [],
     });
   }
@@ -545,6 +548,26 @@ async function handleApproveRelease(interaction) {
  * @param {import('discord.js').Client} client
  * @param {import('discord.js').ButtonInteraction} interaction
  */
+/**
+ * Cancel the pre-thread confirmation prompt and clear all flow state for both users.
+ */
+async function handleCancelCreateThread(client, interaction) {
+  const uid = interaction.user.id;
+  const flow = await getFlow(uid);
+
+  // Fully clear flows for both sides
+  await clearFlow(uid);
+  if (flow?.counterpartyId) {
+    await clearFlow(flow.counterpartyId);
+  }
+
+  await interaction.update({
+    content: "❌ Trade setup cancelled.",
+    embeds: [],
+    components: [],
+  });
+}
+
 export async function handleButton(client, interaction) {
   const id = interaction.customId;
 
@@ -558,6 +581,8 @@ export async function handleButton(client, interaction) {
         return handleSelectRole(interaction, "seller");
       case "create_thread":
         return handleCreateThread(client, interaction);
+      case "cancel_create_thread":
+        return handleCancelCreateThread(client, interaction);
       case "agree_buyer":
         return handleAgreeBuyer(interaction);
       case "agree_seller":

@@ -54,12 +54,17 @@ function buildInteractionWebhook(applicationId, interactionToken) {
  * @throws If the token is invalid/expired or the original message no longer exists,
  *         discord.js will throw a DiscordAPIError (e.g., Unknown Webhook/Message).
  */
-export async function updateEphemeralOriginal(applicationId, interactionToken, options) {
+export async function updateEphemeralOriginal(
+  applicationId,
+  interactionToken,
+  options,
+) {
   const webhook = buildInteractionWebhook(applicationId, interactionToken);
 
   // Ensure we don't accidentally include unsupported fields (like flags) when editing.
   // Clone and sanitize options.
-  const { flags, ...safeOptions } = options ?? {};
+  const safeOptions = { ...(options ?? {}) };
+  delete safeOptions.flags;
 
   return webhook.editMessage("@original", safeOptions);
 }
@@ -79,7 +84,7 @@ export async function updateEphemeralContent(
   applicationId,
   interactionToken,
   content,
-  { clearComponents = false, clearEmbeds = false } = {}
+  { clearComponents = false, clearEmbeds = false } = {},
 ) {
   const options = {
     content,

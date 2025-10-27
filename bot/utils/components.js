@@ -114,6 +114,10 @@ export function buildCreateThreadRow() {
       .setCustomId("create_thread")
       .setLabel("✅ Confirm")
       .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId("cancel_create_thread")
+      .setLabel("❌ Cancel")
+      .setStyle(ButtonStyle.Danger),
   );
 }
 
