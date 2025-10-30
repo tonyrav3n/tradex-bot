@@ -18,7 +18,6 @@
  *     uid: interaction.user.id,
  *     buyerAddress: f.buyerAddress,
  *     sellerAddress: f.sellerAddress,
- *     amountEth: "0.001",
  *   });
  */
 
@@ -28,8 +27,6 @@ import { getFlow, setFlow } from "./flowRepo.js";
 import { initEscrowStatusAndWatcher } from "./escrowStatus.js";
 import {
   recordEscrowCreation,
-  setEscrowDiscordContext,
-  setEscrowParties,
   setStatusMessageId,
   markFunded,
 } from "./escrowRepo.js";
@@ -41,7 +38,7 @@ import { watchEscrowFunded } from "./escrow.js";
  * @property {string} uid - The user id whose flow we should read/update (flow must have role/counterparty).
  * @property {string} buyerAddress - The buyer's EOA address
  * @property {string} sellerAddress - The seller's EOA address
- * @property {string|number} [amountEth="0.001"] - Amount used only for display/consistency; factory call doesn't require it today.
+ * @property {string|number} [amountEth] - Optional display-only amount; factory call doesn't require it.
  * @property {Object} [initOptions] - Options forwarded to initEscrowStatusAndWatcher
  * @property {boolean} [initOptions.backfill=true] - Whether to backfill funded state
  * @property {string} [initOptions.title="Escrow Status"] - Embed title
@@ -61,7 +58,7 @@ export async function createAndAnnounceTrade({
   uid,
   buyerAddress,
   sellerAddress,
-  amountEth = "0.001",
+  amountEth,
   initOptions,
 }) {
   if (!channel || typeof channel.send !== "function") {
@@ -134,7 +131,6 @@ export async function createAndAnnounceTrade({
           sellerAddress: full?.sellerAddress ?? null,
         });
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("DB recordEscrowCreation failed:", e);
       }
 
@@ -146,21 +142,19 @@ export async function createAndAnnounceTrade({
             try {
               await markFunded(escrowAddress, { amountWei });
             } catch (err) {
-              // eslint-disable-next-line no-console
               console.error("DB markFunded failed:", err);
             }
           },
           { emitOnStart: true },
         );
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("Failed to start DB funded watcher:", e);
       }
     }
 
     // 5) Edit the progress message to success + details
     await creatingMsg.edit({
-      content: `✅ Trade created! Tx: ${txHash}${escrowAddress ? ` | Escrow: ${escrowAddress}` : ""}`,
+      content: `✅ Trade created!\n\n🔗 Tx Hash:\n${txHash}\n\n💰 Escrow Contract Address\n${escrowAddress}`,
     });
 
     // 6) Initialize the status embed + watcher
@@ -170,28 +164,17 @@ export async function createAndAnnounceTrade({
           channel,
           uid,
           escrowAddress,
-          options: {
-            backfill: true,
-            title: initOptions?.title ?? "Escrow Status",
-            initialDescription:
-              initOptions?.initialDescription ??
-              "This will update automatically when the buyer funds the escrow.",
-            updatedDescription:
-              initOptions?.updatedDescription ??
-              "Escrow status has been updated.",
-          },
+          options: initOptions ?? {},
         });
         if (messageId) {
           try {
             await setStatusMessageId(escrowAddress, messageId);
           } catch (e2) {
-            // eslint-disable-next-line no-console
             console.error("DB setStatusMessageId failed:", e2);
           }
         }
       } catch (e) {
         // Non-fatal: keep going even if init fails
-        // eslint-disable-next-line no-console
         console.error(
           "createAndAnnounceTrade: failed to init status embed/watcher:",
           e,

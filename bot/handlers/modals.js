@@ -176,14 +176,6 @@ async function handleBuyerAddressModal(client, interaction) {
         uid,
         buyerAddress: f.buyerAddress,
         sellerAddress: f.sellerAddress,
-        amountEth: "0.001",
-        initOptions: {
-          backfill: true,
-          title: "Escrow Status",
-          initialDescription:
-            "This will update automatically when the buyer funds the escrow.",
-          updatedDescription: "Escrow status has been updated.",
-        },
       });
     } catch (e) {
       await interaction.channel.send({
@@ -259,6 +251,10 @@ async function handleSellerAddressModal(client, interaction) {
     }
   }
 
+  await interaction.editReply({
+    content: "Seller address registered.",
+  });
+
   const f = await getFlow(uid);
   // If both parties agreed and provided addresses, create the trade
   if (
@@ -283,14 +279,6 @@ async function handleSellerAddressModal(client, interaction) {
         uid,
         buyerAddress: f.buyerAddress,
         sellerAddress: f.sellerAddress,
-        amountEth: "0.001",
-        initOptions: {
-          backfill: true,
-          title: "Escrow Status",
-          initialDescription:
-            "This will update automatically when the buyer funds the escrow.",
-          updatedDescription: "Escrow status has been updated.",
-        },
       });
     } catch (e) {
       await interaction.channel.send({
@@ -298,10 +286,6 @@ async function handleSellerAddressModal(client, interaction) {
       });
     }
   }
-
-  await interaction.editReply({
-    content: "Seller address registered.",
-  });
 }
 
 /**

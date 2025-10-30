@@ -58,9 +58,9 @@ export async function initEscrowStatusAndWatcher({
 
   const {
     backfill = true,
-    title = "Escrow Status",
+    title,
     initialDescription = "This will update automatically when the buyer funds the escrow.",
-    updatedDescription = "Escrow status has been updated.",
+    updatedDescription = "Buyer has funded",
     overrideBuyerId,
     overrideSellerId,
   } = options;
@@ -88,9 +88,9 @@ export async function initEscrowStatusAndWatcher({
         escrowAddress,
         buyerId,
         sellerId,
-        statusText: state?.statusText ?? "Created",
-        amountEth: state?.amountEth ?? "0",
-        color: state?.color ?? 0x95a5a6,
+        statusText: state?.statusText,
+        amountEth: state?.amountEth,
+        color: state?.color,
         title,
         description: initialDescription,
       });
@@ -156,8 +156,8 @@ export async function initEscrowStatusAndWatcher({
               escrowAddress,
               buyerId,
               sellerId,
-              statusText: updated?.statusText ?? "Funded",
-              amountEth: updated?.amountEth ?? "0",
+              statusText: updated?.statusText,
+              amountEth: updated?.amountEth,
               color: updated?.color ?? 0x2ecc71, // default to "Funded" green if missing
               title,
               description: updatedDescription,

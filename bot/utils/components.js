@@ -88,23 +88,29 @@ export function buildConfirmationEmbed({
       { name: "Item", value: description, inline: false },
       {
         name: "Price (USD)",
-        value: priceUsd ? `$${priceUsd}` : "—",
+        value: `$${priceUsd}`,
         inline: true,
       },
     )
     .setColor("#00B686");
 }
 
-export function buildCreatedEmbed({ buyerId, sellerId, description }) {
+export function buildCreatedEmbed({
+  buyerId,
+  sellerId,
+  description,
+  priceUsd,
+}) {
   return new EmbedBuilder()
-    .setTitle("Trade Created")
-    .setDescription("A private thread has been created for this trade.")
+    .setTitle("💼 Trade Summary")
+    .setDescription("Awaiting agreement from both parties:\n\n")
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
       { name: "Seller", value: `<@${sellerId}>`, inline: true },
       { name: "Item", value: description, inline: false },
+      { name: "Price (USD)", value: `$${priceUsd}`, inline: true },
     )
-    .setFooter({ text: "Confirm to continue securely." })
+    .setFooter({ text: "🔐 Confirm to continue securely." })
     .setColor("#2ecc71");
 }
 
@@ -128,12 +134,12 @@ export function buildAgreeRow({
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("agree_buyer")
-      .setLabel("Buyer Agree")
+      .setLabel("✅ Buyer Agree")
       .setStyle(ButtonStyle.Success)
       .setDisabled(buyerDisabled),
     new ButtonBuilder()
       .setCustomId("agree_seller")
-      .setLabel("Seller Agree")
+      .setLabel("🛒 Seller Agree")
       .setStyle(ButtonStyle.Success)
       .setDisabled(sellerDisabled),
   );
@@ -192,32 +198,46 @@ export function buildEscrowStatusEmbed({
   statusText = "Created",
   amountEth = "0",
   color = 0x95a5a6,
-  title = "Escrow Status",
+  title = "📊 Escrow Status",
   description,
 } = {}) {
+  const s = String(statusText ?? "").toLowerCase();
+  let nextAction = null;
+  if (s === "created") nextAction = "buyer to fund escrow";
+  else if (s === "funded") nextAction = "seller to mark delivered";
+  else if (s === "delivered") nextAction = "buyer to approve & release";
+
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(description ?? "Current escrow status and details.")
     .addFields(
-      { name: "Status", value: statusText, inline: true },
+      { name: "🕓 Status", value: statusText, inline: false },
       {
-        name: "Amount",
+        name: "💵 Amount",
         value: amountEth ? `${amountEth} ETH` : "—",
-        inline: true,
+        inline: false,
       },
       {
-        name: "Escrow",
+        name: "💰 Escrow",
         value: escrowAddress ? `\`${escrowAddress}\`` : "—",
         inline: false,
       },
-      { name: "Buyer", value: buyerId ? `<@${buyerId}>` : "—", inline: true },
       {
-        name: "Seller",
+        name: "👤 Buyer",
+        value: buyerId ? `<@${buyerId}>` : "—",
+        inline: true,
+      },
+      {
+        name: "🏷️ Seller",
         value: sellerId ? `<@${sellerId}>` : "—",
         inline: true,
       },
     )
     .setColor(color);
+
+  if (nextAction) {
+    embed.setFooter({ text: `🕓 Awaiting ${nextAction}` });
+  }
 
   return embed;
 }

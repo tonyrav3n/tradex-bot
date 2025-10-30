@@ -6,7 +6,7 @@
  *   - create_trade_button (demo)
  *   - create_trade_flow_button
  *   - role_buyer / role_seller
- *   - create_thread
+ *   - create_
  *   - agree_buyer / agree_seller
  *   - mark_delivered / approve_release
  *
@@ -36,6 +36,7 @@ import {
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { publicClient } from "../utils/client.js";
+import { safeThreadPatchMessage } from "../utils/threads.js";
 import {
   getEscrowState,
   markEscrowDelivered,
@@ -54,11 +55,15 @@ async function updateEscrowStatusMessage(interaction, uid, embed, updated) {
   const msgId = (await getFlow(uid))?.escrowStatusMessageId;
   if (!msgId) return;
   try {
-    const msg = await interaction.channel.messages.fetch(msgId);
-    await msg.edit({
-      embeds: [embed],
-      components: buildActionsForStatus(updated.status ?? updated.statusText),
-    });
+    await safeThreadPatchMessage(
+      interaction.channel,
+      msgId,
+      {
+        embeds: [embed],
+        components: buildActionsForStatus(updated.status ?? updated.statusText),
+      },
+      { extendDurationTo: 1440 },
+    );
   } catch (e) {
     console.error("Failed to update escrow status message:", e);
   }
@@ -151,6 +156,7 @@ async function handleCreateThread(client, interaction) {
   await interaction.update({
     content: "⏳ Creating private thread...",
     components: [],
+    embeds: [],
   });
 
   const buyerId = flow.role === "buyer" ? uid : flow.counterpartyId;
@@ -188,6 +194,7 @@ async function handleCreateThread(client, interaction) {
     buyerId,
     sellerId,
     description: flow.description,
+    priceUsd: flow.priceUsd,
   });
 
   const threadName = `trade-${uid.slice(-4)}-${flow.counterpartyId.slice(-4)}`;
@@ -195,6 +202,7 @@ async function handleCreateThread(client, interaction) {
     name: threadName,
     autoArchiveDuration: 1440,
     type: ChannelType.PrivateThread,
+    invitable: false,
   });
 
   await thread.members.add(buyerId).catch(() => {});
@@ -414,7 +422,6 @@ async function handleMarkDelivered(interaction) {
       statusText: updated.statusText,
       amountEth: updated.amountEth,
       color: updated.color,
-      title: "Escrow Status",
       description: "Seller marked as Delivered.",
     });
     await updateEscrowStatusMessage(interaction, uid, embed2, updated);
@@ -524,7 +531,6 @@ async function handleApproveRelease(interaction) {
       statusText: updated.statusText,
       amountEth: updated.amountEth,
       color: updated.color,
-      title: "Escrow Status",
       description: "Buyer approved delivery. Funds released.",
     });
     await updateEscrowStatusMessage(interaction, uid, embed2, updated);
