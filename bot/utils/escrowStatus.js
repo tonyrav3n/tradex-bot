@@ -182,7 +182,7 @@ export async function initEscrowStatusAndWatcher({
                 if (updatedLabel === "funded" && sellerId) {
                   try {
                     await channel.send({
-                      content: `<@${sellerId}> Buyer has funded. Please mark delivered.`,
+                      content: `<@${sellerId}> Buyer has funded. Please deliver and click the 'Mark Delivered' button.`,
                       allowedMentions: { users: [String(sellerId)], parse: [] },
                     });
                   } catch (e3) {

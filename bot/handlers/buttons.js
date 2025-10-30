@@ -246,7 +246,7 @@ async function handleAgreeBuyer(interaction) {
   const uid = interaction.user.id;
   const flow = await getFlow(uid);
   if (!flow) {
-    await interaction.reply({
+    await interaction.editReply({
       content: "No active trade flow found.",
       flags: MessageFlags.Ephemeral,
       components: [],
@@ -334,6 +334,7 @@ async function handleAgreeSeller(interaction) {
  * Seller marks delivered (contract write via bot).
  */
 async function handleMarkDelivered(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const uid = interaction.user.id;
   const flow = await getFlow(uid);
   if (!flow) {
@@ -345,7 +346,7 @@ async function handleMarkDelivered(interaction) {
   }
   const check = assertSeller(uid, flow);
   if (!check.ok) {
-    await interaction.reply({
+    await interaction.editReply({
       content: check.message,
       flags: MessageFlags.Ephemeral,
     });
@@ -353,7 +354,7 @@ async function handleMarkDelivered(interaction) {
   }
   const escrowAddress = flow.escrowAddress;
   if (!escrowAddress) {
-    await interaction.reply({
+    await interaction.editReply({
       content: "Escrow is not created yet.",
       flags: MessageFlags.Ephemeral,
     });
@@ -363,7 +364,7 @@ async function handleMarkDelivered(interaction) {
   try {
     const state = await getEscrowState(escrowAddress);
     if (Number(state.status) !== 1) {
-      await interaction.reply({
+      await interaction.editReply({
         content: "Trade is not at 'Funded' state.",
         flags: MessageFlags.Ephemeral,
       });
@@ -376,7 +377,7 @@ async function handleMarkDelivered(interaction) {
     const rateKey = keyFor("mark_delivered", escrowAddress);
     const cd = checkCooldown(rateKey);
     if (!cd.ok) {
-      await interaction.reply({
+      await interaction.editReply({
         content: `Action cooling down. Try again in ${Math.ceil(cd.remainingMs / 1000)}s.`,
         flags: MessageFlags.Ephemeral,
       });
@@ -389,12 +390,12 @@ async function handleMarkDelivered(interaction) {
     });
     if (!res.ok) {
       if (res.remainingMs) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `Action already in progress. Try again in ${Math.ceil(res.remainingMs / 1000)}s.`,
           flags: MessageFlags.Ephemeral,
         });
       } else {
-        await interaction.reply({
+        await interaction.editReply({
           content: "Action could not start. Please try again shortly.",
           flags: MessageFlags.Ephemeral,
         });
@@ -432,12 +433,12 @@ async function handleMarkDelivered(interaction) {
       allowedMentions: { users: [String(buyerId2)], parse: [] },
     });
 
-    await interaction.reply({
+    await interaction.editReply({
       content: `✅ Marked delivered. Tx: ${txHash}`,
       flags: MessageFlags.Ephemeral,
     });
   } catch (e) {
-    await interaction.reply({
+    await interaction.editReply({
       content: `❌ Failed to mark delivered: ${e.message}`,
       flags: MessageFlags.Ephemeral,
     });
@@ -448,10 +449,11 @@ async function handleMarkDelivered(interaction) {
  * Buyer approves delivery and releases funds (contract write via bot).
  */
 async function handleApproveRelease(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const uid = interaction.user.id;
   const flow = await getFlow(uid);
   if (!flow) {
-    await interaction.reply({
+    await interaction.editReply({
       content: "No active trade flow found.",
       flags: MessageFlags.Ephemeral,
     });
@@ -460,7 +462,7 @@ async function handleApproveRelease(interaction) {
   const buyerId =
     flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
   if (uid !== buyerId) {
-    await interaction.reply({
+    await interaction.editReply({
       content: "You are not the buyer for this trade.",
       flags: MessageFlags.Ephemeral,
     });
@@ -468,7 +470,7 @@ async function handleApproveRelease(interaction) {
   }
   const escrowAddress = flow.escrowAddress;
   if (!escrowAddress) {
-    await interaction.reply({
+    await interaction.editReply({
       content: "Escrow is not created yet.",
       flags: MessageFlags.Ephemeral,
     });
@@ -478,7 +480,7 @@ async function handleApproveRelease(interaction) {
   try {
     const state = await getEscrowState(escrowAddress);
     if (Number(state.status) !== 2) {
-      await interaction.reply({
+      await interaction.editReply({
         content: "Trade is not at 'Delivered' state.",
         flags: MessageFlags.Ephemeral,
       });
@@ -491,7 +493,7 @@ async function handleApproveRelease(interaction) {
     const rateKey = keyFor("approve_release", escrowAddress);
     const cd = checkCooldown(rateKey);
     if (!cd.ok) {
-      await interaction.reply({
+      await interaction.editReply({
         content: `Action cooling down. Try again in ${Math.ceil(cd.remainingMs / 1000)}s.`,
         flags: MessageFlags.Ephemeral,
       });
@@ -504,12 +506,12 @@ async function handleApproveRelease(interaction) {
     });
     if (!res.ok) {
       if (res.remainingMs) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `Action already in progress. Try again in ${Math.ceil(res.remainingMs / 1000)}s.`,
           flags: MessageFlags.Ephemeral,
         });
       } else {
-        await interaction.reply({
+        await interaction.editReply({
           content: "Action could not start. Please try again shortly.",
           flags: MessageFlags.Ephemeral,
         });
@@ -547,12 +549,12 @@ async function handleApproveRelease(interaction) {
       allowedMentions: { users: [String(sellerId2)], parse: [] },
     });
 
-    await interaction.reply({
+    await interaction.editReply({
       content: `✅ Approved and released. Tx: ${txHash}`,
       flags: MessageFlags.Ephemeral,
     });
   } catch (e) {
-    await interaction.reply({
+    await interaction.editReply({
       content: `❌ Failed to approve/release: ${e.message}`,
       flags: MessageFlags.Ephemeral,
     });

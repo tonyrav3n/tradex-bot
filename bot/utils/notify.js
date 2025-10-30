@@ -10,7 +10,7 @@
  *   await notifyCounterparty({
  *     channel: interaction.channel,    // TextChannel or ThreadChannel
  *     targetUserId: sellerId,          // the user to notify
- *     message: "Buyer has funded. Please mark delivered.",
+ *     message: "Buyer has funded. Please deliver and click the 'Mark Delivered' button.",
  *   });
  */
 

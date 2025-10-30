@@ -5,7 +5,7 @@ import "./TradeNestEscrow.sol";
 
 contract TradeNestFactory {
     TradeNestEscrow[] public escrows;
-    address public bot; // the bot address controlling all escrows
+    address public bot;
 
     event EscrowCreated(
         address indexed escrowAddress,

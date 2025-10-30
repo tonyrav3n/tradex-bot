@@ -204,7 +204,7 @@ export function buildEscrowStatusEmbed({
   const s = String(statusText ?? "").toLowerCase();
   let nextAction = null;
   if (s === "created") nextAction = "buyer to fund escrow";
-  else if (s === "funded") nextAction = "seller to mark delivered";
+  else if (s === "funded") nextAction = "seller to deliver";
   else if (s === "delivered") nextAction = "buyer to approve & release";
 
   const embed = new EmbedBuilder()
