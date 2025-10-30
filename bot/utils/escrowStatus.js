@@ -174,6 +174,30 @@ export async function initEscrowStatusAndWatcher({
                     updated?.status ?? updated?.statusText,
                   ),
                 });
+
+                // Notify the counterparty in the thread about the next action
+                const updatedLabel = String(
+                  updated?.statusText ?? "",
+                ).toLowerCase();
+                if (updatedLabel === "funded" && sellerId) {
+                  try {
+                    await channel.send({
+                      content: `<@${sellerId}> Buyer has funded. Please mark delivered.`,
+                      allowedMentions: { users: [String(sellerId)], parse: [] },
+                    });
+                  } catch (e3) {
+                    console.error("notify seller failed:", e3);
+                  }
+                } else if (updatedLabel === "delivered" && buyerId) {
+                  try {
+                    await channel.send({
+                      content: `<@${buyerId}> Seller marked delivered. Please approve & release.`,
+                      allowedMentions: { users: [String(buyerId)], parse: [] },
+                    });
+                  } catch (e4) {
+                    console.error("notify buyer failed:", e4);
+                  }
+                }
               } catch (e) {
                 console.error(
                   "initEscrowStatusAndWatcher: failed to edit status embed:",

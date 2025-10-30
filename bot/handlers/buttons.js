@@ -426,6 +426,12 @@ async function handleMarkDelivered(interaction) {
     });
     await updateEscrowStatusMessage(interaction, uid, embed2, updated);
 
+    // Notify buyer in the thread about the next action
+    await interaction.channel.send({
+      content: `<@${buyerId2}> Seller marked delivered. Please approve & release.`,
+      allowedMentions: { users: [String(buyerId2)], parse: [] },
+    });
+
     await interaction.reply({
       content: `✅ Marked delivered. Tx: ${txHash}`,
       flags: MessageFlags.Ephemeral,
@@ -534,6 +540,12 @@ async function handleApproveRelease(interaction) {
       description: "Buyer approved delivery. Funds released.",
     });
     await updateEscrowStatusMessage(interaction, uid, embed2, updated);
+
+    // Notify seller in the thread about completion
+    await interaction.channel.send({
+      content: `<@${sellerId2}> Buyer approved delivery. Funds released.`,
+      allowedMentions: { users: [String(sellerId2)], parse: [] },
+    });
 
     await interaction.reply({
       content: `✅ Approved and released. Tx: ${txHash}`,
