@@ -75,7 +75,7 @@ async function handleTradeDescriptionModal(client, interaction) {
 
   const appId = client?.application?.id;
   const payload = {
-    content: "Review the details and proceed to invite the counterparty.",
+    content: "✅ Review the details and proceed to invite the counterparty.",
     embeds: [embed],
     components: [row],
   };
@@ -106,7 +106,7 @@ async function handleBuyerAddressModal(client, interaction) {
   const checkBuyer = assertBuyer(uid, fcheck);
   if (!checkBuyer.ok) {
     await interaction.editReply({
-      content: checkBuyer.message,
+      content: `⚠️ ${checkBuyer.message}`,
     });
     return;
   }
@@ -114,7 +114,7 @@ async function handleBuyerAddressModal(client, interaction) {
   const rawBuyer = interaction.fields.getTextInputValue("buyer_address");
   const vBuyer = await normalizeAndValidateAddress(rawBuyer);
   if (!vBuyer.ok) {
-    await interaction.editReply({ content: vBuyer.error });
+    await interaction.editReply({ content: `❌ ${vBuyer.error}` });
     return;
   }
   await setBuyerAddress(uid, vBuyer.address);
@@ -166,7 +166,7 @@ async function handleBuyerAddressModal(client, interaction) {
       String(f.sellerAddress).toLowerCase()
     ) {
       await interaction.channel.send({
-        content: "Buyer and Seller addresses must be different.",
+        content: "⚠️ Buyer and Seller addresses must be different.",
       });
       return;
     }
@@ -185,7 +185,7 @@ async function handleBuyerAddressModal(client, interaction) {
   }
 
   await interaction.editReply({
-    content: "Buyer address registered.",
+    content: "✅ Buyer address registered.",
   });
 }
 
@@ -205,7 +205,7 @@ async function handleSellerAddressModal(client, interaction) {
   const checkSeller = assertSeller(uid, fcheck);
   if (!checkSeller.ok) {
     await interaction.editReply({
-      content: checkSeller.message,
+      content: `⚠️ ${checkSeller.message}`,
     });
     return;
   }
@@ -213,7 +213,7 @@ async function handleSellerAddressModal(client, interaction) {
   const rawSeller = interaction.fields.getTextInputValue("seller_address");
   const vSeller = await normalizeAndValidateAddress(rawSeller);
   if (!vSeller.ok) {
-    await interaction.editReply({ content: vSeller.error });
+    await interaction.editReply({ content: `❌ ${vSeller.error}` });
     return;
   }
   await setSellerAddress(uid, vSeller.address);
@@ -252,7 +252,7 @@ async function handleSellerAddressModal(client, interaction) {
   }
 
   await interaction.editReply({
-    content: "Seller address registered.",
+    content: "✅ Seller address registered.",
   });
 
   const f = await getFlow(uid);
@@ -269,7 +269,7 @@ async function handleSellerAddressModal(client, interaction) {
       String(f.sellerAddress).toLowerCase()
     ) {
       await interaction.channel.send({
-        content: "Buyer and Seller addresses must be different.",
+        content: "⚠️ Buyer and Seller addresses must be different.",
       });
       return;
     }
@@ -313,7 +313,7 @@ export async function handleModal(client, interaction) {
     if (interaction.deferred && !interaction.replied) {
       try {
         await interaction.editReply({
-          content: `There was an error handling your submission: ${err.message}`,
+          content: `❌ There was an error handling your submission: ${err.message}`,
         });
       } catch (e) {
         console.error("Failed to edit modal error reply:", e);
@@ -321,7 +321,7 @@ export async function handleModal(client, interaction) {
     } else if (!interaction.replied && !interaction.deferred) {
       try {
         await interaction.reply({
-          content: `There was an error handling your submission: ${err.message}`,
+          content: `❌ There was an error handling your submission: ${err.message}`,
           flags: MessageFlags.Ephemeral,
         });
       } catch (e) {

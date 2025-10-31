@@ -1,5 +1,6 @@
 import { publicClient, walletClient } from "./client.js";
 import { formatEther } from "viem";
+import { escrowEmbedColorForStatus } from "./theme.js";
 
 /**
  * Minimal Escrow ABI for reading and event watching.
@@ -109,15 +110,6 @@ export const ESCROW_STATUS = Object.freeze({
   Disputed: 5,
 });
 
-export const ESCROW_STATUS_COLORS = Object.freeze({
-  [ESCROW_STATUS.Created]: 0x95a5a6, // gray
-  [ESCROW_STATUS.Funded]: 0x2ecc71, // green
-  [ESCROW_STATUS.Delivered]: 0xf1c40f, // yellow
-  [ESCROW_STATUS.Completed]: 0x3498db, // blue
-  [ESCROW_STATUS.Cancelled]: 0xe74c3c, // red
-  [ESCROW_STATUS.Disputed]: 0x9b59b6, // purple
-});
-
 export function statusLabel(status) {
   switch (Number(status)) {
     case ESCROW_STATUS.Created:
@@ -211,7 +203,7 @@ export async function getEscrowState(escrowAddress) {
     amountEth,
     status: statusNum,
     statusText: statusLabel(statusNum),
-    color: ESCROW_STATUS_COLORS[statusNum] ?? 0x95a5a6,
+    color: escrowEmbedColorForStatus(statusNum),
   };
 }
 

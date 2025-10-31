@@ -80,7 +80,7 @@ async function handleStartFlow(client, interaction) {
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   await interaction.editReply({
-    content: "Great! To start, what's your side of the trade?",
+    content: "🧭 Great! To start, what's your side of the trade?",
     components: [buildRoleButtonsRow()],
   });
 }
@@ -101,7 +101,7 @@ async function handleSelectRole(interaction, role) {
   // Role buttons are in an ephemeral message; use deferUpdate to replace components
   await interaction.deferUpdate();
   await interaction.editReply({
-    content: "Got it. Who are you trading with?",
+    content: "🤝 Got it. Who are you trading with?",
     components: [buildCounterpartySelectRow()],
   });
 }
@@ -115,7 +115,7 @@ async function handleCreateThread(client, interaction) {
   if (!flow || !flow.role || !flow.counterpartyId || !flow.description) {
     return interaction.update({
       content:
-        "Trade details are incomplete. Please restart with Create Trade.",
+        "⚠️ Trade details are incomplete. Please restart with Create Trade.",
       components: [],
     });
   }
@@ -209,11 +209,11 @@ async function handleCreateThread(client, interaction) {
   await thread.members.add(sellerId).catch(() => {});
 
   await thread.send({
-    content: `Welcome <@${buyerId}> and <@${sellerId}>`,
+    content: `👋 Welcome <@${buyerId}> and <@${sellerId}>`,
     embeds: [embed],
   });
   const agreeMsg = await thread.send({
-    content: "Please both click Agree to proceed.",
+    content: "✅ Please both click Agree to proceed.",
     components: [buildAgreeRow()],
   });
 
@@ -227,7 +227,7 @@ async function handleCreateThread(client, interaction) {
   const appId = client?.application?.id;
 
   const payload = {
-    content: `Perfect. I've created a private thread for you and your partner. Let's head there to finalise the trade: → <#${thread.id}>`,
+    content: `🔒 Perfect. I've created a private thread for you and your partner. Let's head there to finalise the trade: → <#${thread.id}>`,
     components: [],
     embeds: [],
   };
@@ -247,7 +247,7 @@ async function handleAgreeBuyer(interaction) {
   const flow = await getFlow(uid);
   if (!flow) {
     await interaction.editReply({
-      content: "No active trade flow found.",
+      content: "⚠️ No active trade flow found.",
       flags: MessageFlags.Ephemeral,
       components: [],
     });
@@ -276,7 +276,7 @@ async function handleAgreeBuyer(interaction) {
   // Only block as 'already agreed' if we have a positive agreement with an address
   if (fresh.buyerAgreed && fresh.buyerAddress) {
     await interaction.reply({
-      content: "You already agreed.",
+      content: "ℹ️ You already agreed.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -292,7 +292,7 @@ async function handleAgreeSeller(interaction) {
   const flow = await getFlow(uid);
   if (!flow) {
     await interaction.reply({
-      content: "No active trade flow found.",
+      content: "⚠️ No active trade flow found.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -302,7 +302,7 @@ async function handleAgreeSeller(interaction) {
     (flow.role === "seller" ? uid : flow.counterpartyId);
   if (uid !== sellerId) {
     await interaction.reply({
-      content: "You are not the seller for this trade.",
+      content: "⚠️ You are not the seller for this trade.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -322,7 +322,7 @@ async function handleAgreeSeller(interaction) {
   // Only block as 'already agreed' if we have a positive agreement with an address
   if (fresh.sellerAgreed && fresh.sellerAddress) {
     await interaction.reply({
-      content: "You already agreed.",
+      content: "ℹ️ You already agreed.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -339,7 +339,7 @@ async function handleMarkDelivered(interaction) {
   const flow = await getFlow(uid);
   if (!flow) {
     await interaction.reply({
-      content: "No active trade flow found.",
+      content: "⚠️ No active trade flow found.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -355,7 +355,7 @@ async function handleMarkDelivered(interaction) {
   const escrowAddress = flow.escrowAddress;
   if (!escrowAddress) {
     await interaction.editReply({
-      content: "Escrow is not created yet.",
+      content: "⚠️ Escrow is not created yet.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -365,7 +365,7 @@ async function handleMarkDelivered(interaction) {
     const state = await getEscrowState(escrowAddress);
     if (Number(state.status) !== 1) {
       await interaction.editReply({
-        content: "Trade is not at 'Funded' state.",
+        content: "⚠️ Trade is not at 'Funded' state.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -429,7 +429,7 @@ async function handleMarkDelivered(interaction) {
 
     // Notify buyer in the thread about the next action
     await interaction.channel.send({
-      content: `<@${buyerId2}> Seller marked delivered. Please approve & release.`,
+      content: `🔔 <@${buyerId2}> Seller marked delivered. Please approve & release.`,
       allowedMentions: { users: [String(buyerId2)], parse: [] },
     });
 
@@ -454,7 +454,7 @@ async function handleApproveRelease(interaction) {
   const flow = await getFlow(uid);
   if (!flow) {
     await interaction.editReply({
-      content: "No active trade flow found.",
+      content: "⚠️ No active trade flow found.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -463,7 +463,7 @@ async function handleApproveRelease(interaction) {
     flow.buyerDiscordId ?? (flow.role === "buyer" ? uid : flow.counterpartyId);
   if (uid !== buyerId) {
     await interaction.editReply({
-      content: "You are not the buyer for this trade.",
+      content: "⚠️ You are not the buyer for this trade.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -471,7 +471,7 @@ async function handleApproveRelease(interaction) {
   const escrowAddress = flow.escrowAddress;
   if (!escrowAddress) {
     await interaction.editReply({
-      content: "Escrow is not created yet.",
+      content: "⚠️ Escrow is not created yet.",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -481,7 +481,7 @@ async function handleApproveRelease(interaction) {
     const state = await getEscrowState(escrowAddress);
     if (Number(state.status) !== 2) {
       await interaction.editReply({
-        content: "Trade is not at 'Delivered' state.",
+        content: "⚠️ Trade is not at 'Delivered' state.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -545,7 +545,7 @@ async function handleApproveRelease(interaction) {
 
     // Notify seller in the thread about completion
     await interaction.channel.send({
-      content: `<@${sellerId2}> Buyer approved delivery. Funds released.`,
+      content: `🎉 <@${sellerId2}> Buyer approved delivery. Funds released.`,
       allowedMentions: { users: [String(sellerId2)], parse: [] },
     });
 
@@ -618,7 +618,7 @@ export async function handleButton(client, interaction) {
     if (interaction.deferred && !interaction.replied) {
       try {
         await interaction.editReply({
-          content: `There was an error handling your button: ${err.message}`,
+          content: `❌ There was an error handling your button: ${err.message}`,
         });
       } catch (e) {
         console.error("Failed to edit button error reply:", e);
@@ -626,7 +626,7 @@ export async function handleButton(client, interaction) {
     } else if (!interaction.replied && !interaction.deferred) {
       try {
         await interaction.reply({
-          content: `There was an error handling your button: ${err.message}`,
+          content: `❌ There was an error handling your button: ${err.message}`,
           flags: MessageFlags.Ephemeral,
         });
       } catch (e) {

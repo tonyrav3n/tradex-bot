@@ -27,7 +27,7 @@ async function handleSelectCounterparty(_client, interaction) {
   if (!Array.isArray(interaction.values) || interaction.values.length === 0) {
     try {
       await interaction.reply({
-        content: "Please select a counterparty.",
+        content: "⚠️ Please select a counterparty.",
         flags: MessageFlags.Ephemeral,
       });
     } catch (e) {
@@ -83,7 +83,7 @@ export async function handleSelect(client, interaction) {
     if (interaction.deferred && !interaction.replied) {
       try {
         await interaction.editReply({
-          content: `There was an error handling your selection: ${err.message}`,
+          content: `❌ There was an error handling your selection: ${err.message}`,
         });
       } catch (e) {
         console.error("Failed to edit selection error reply:", e);
@@ -91,7 +91,7 @@ export async function handleSelect(client, interaction) {
     } else if (!interaction.replied && !interaction.deferred) {
       try {
         await interaction.reply({
-          content: `There was an error handling your selection: ${err.message}`,
+          content: `❌ There was an error handling your selection: ${err.message}`,
           flags: MessageFlags.Ephemeral,
         });
       } catch (e) {

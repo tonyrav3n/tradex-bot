@@ -9,6 +9,57 @@ import {
   EmbedBuilder,
 } from "discord.js";
 
+const COLORS = Object.freeze({
+  VERIFIED_GREEN: 0x33d17a,
+  ALERT_RED: 0xed4245,
+  NEUTRAL_GREY: 0x2f3136,
+  BLURPLE: 0x5865f2,
+});
+
+function normalizeStatusLabel(status) {
+  if (typeof status === "number") {
+    switch (Number(status)) {
+      case 0:
+        return "created";
+      case 1:
+        return "funded";
+      case 2:
+        return "delivered";
+      case 3:
+        return "completed";
+      case 4:
+        return "cancelled";
+      case 5:
+        return "disputed";
+      default:
+        return "unknown";
+    }
+  }
+  if (typeof status === "string") {
+    return status.trim().toLowerCase();
+  }
+  return "unknown";
+}
+
+export function escrowEmbedColorForStatus(status) {
+  switch (normalizeStatusLabel(status)) {
+    case "created":
+      return COLORS.VERIFIED_GREEN;
+    case "funded":
+      return COLORS.BLURPLE;
+    case "delivered":
+      return COLORS.VERIFIED_GREEN;
+    case "completed":
+      return COLORS.NEUTRAL_GREY;
+    case "cancelled":
+    case "canceled":
+    case "disputed":
+      return COLORS.ALERT_RED;
+    default:
+      return COLORS.NEUTRAL_GREY;
+  }
+}
+
 export function buildTradeButton() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -20,11 +71,11 @@ export function buildTradeButton() {
 
 export function buildTradeEmbed() {
   return new EmbedBuilder()
-    .setColor("#5865F2")
-    .setTitle("Start a Secure Trade")
+    .setColor(COLORS.VERIFIED_GREEN)
+    .setTitle("🛡️ Start a Secure Trade")
     .setDescription(
-      "Ready to go? I'm here to help!\nClick below \
-      and I'll walk you through creating a secure, \
+      "Ready to go? I'm here to help!\nClick below\
+      and I'll walk you through creating a secure,\
       fair trade for you and your partner.",
     )
     .setFooter({ text: "amis. The digital handshake you can trust." });
@@ -54,29 +105,28 @@ export function buildCounterpartySelectRow() {
 }
 
 export function buildDescriptionModal() {
-  const desc = new TextInputBuilder({
-    custom_id: "trade_description",
-    label: "What are you trading? (Be as clear as possible)",
-    style: TextInputStyle.Paragraph,
-    required: true,
-    max_length: 500,
-  });
+  const desc = new TextInputBuilder()
+    .setCustomId("trade_description")
+    .setLabel("What are you trading? (Be as clear as possible)")
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true)
+    .setMaxLength(500);
 
-  const price = new TextInputBuilder({
-    custom_id: "trade_price_usd",
-    label: "What's the agreed price? (USD)",
-    style: TextInputStyle.Short,
-    required: true,
-  });
+  const price = new TextInputBuilder()
+    .setCustomId("trade_price_usd")
+    .setLabel("What's the agreed price? (USD)")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
 
   const row1 = new ActionRowBuilder().addComponents(desc);
   const row2 = new ActionRowBuilder().addComponents(price);
 
-  return new ModalBuilder({
-    custom_id: "trade_description_modal",
-    title: "Trade Details",
-    components: [row1, row2],
-  });
+  const modal = new ModalBuilder()
+    .setCustomId("trade_description_modal")
+    .setTitle("Trade Details")
+    .addComponents(row1, row2);
+
+  return modal;
 }
 
 export function buildConfirmationEmbed({
@@ -86,7 +136,7 @@ export function buildConfirmationEmbed({
   priceUsd,
 }) {
   return new EmbedBuilder()
-    .setTitle("Let's Double-Check!")
+    .setTitle("✅ Let's Double-Check!")
     .setDescription(
       "Please make sure everything is perfect. This will become the basis for our secure contract.:\n\n",
     )
@@ -100,7 +150,7 @@ export function buildConfirmationEmbed({
         inline: true,
       },
     )
-    .setColor("#00B686");
+    .setColor(COLORS.VERIFIED_GREEN);
 }
 
 export function buildCreatedEmbed({
@@ -110,7 +160,7 @@ export function buildCreatedEmbed({
   priceUsd,
 }) {
   return new EmbedBuilder()
-    .setTitle("Trade Summary")
+    .setTitle("📄 Trade Summary")
     .setDescription(
       "Please review the details below. Once you both agree, I'll ask the buyer to fund the trade.",
     )
@@ -121,7 +171,7 @@ export function buildCreatedEmbed({
       { name: "\nPrice (USD)", value: `$${priceUsd}`, inline: true },
     )
     .setFooter({ text: "Final check." })
-    .setColor("#2ecc71");
+    .setColor(COLORS.VERIFIED_GREEN);
 }
 
 export function buildCreateThreadRow() {
@@ -174,33 +224,33 @@ export function buildProvideSellerAddressRow() {
 }
 
 export function buildBuyerAddressModal() {
-  const input = new TextInputBuilder({
-    custom_id: "buyer_address",
-    label: "Your Address",
-    style: TextInputStyle.Short,
-    required: true,
-  });
+  const input = new TextInputBuilder()
+    .setCustomId("buyer_address")
+    .setLabel("Your Address")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
   const row = new ActionRowBuilder().addComponents(input);
-  return new ModalBuilder({
-    custom_id: "buyer_address_modal",
-    title: "Buyer Address",
-    components: [row],
-  });
+  const modal = new ModalBuilder()
+    .setCustomId("buyer_address_modal")
+    .setTitle("Buyer Address")
+    .addComponents(row);
+
+  return modal;
 }
 
 export function buildSellerAddressModal() {
-  const input = new TextInputBuilder({
-    custom_id: "seller_address",
-    label: "Your Address",
-    style: TextInputStyle.Short,
-    required: true,
-  });
+  const input = new TextInputBuilder()
+    .setCustomId("seller_address")
+    .setLabel("Your Address")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
   const row = new ActionRowBuilder().addComponents(input);
-  return new ModalBuilder({
-    custom_id: "seller_address_modal",
-    title: "Seller Address",
-    components: [row],
-  });
+  const modal = new ModalBuilder()
+    .setCustomId("seller_address_modal")
+    .setTitle("Seller Address")
+    .addComponents(row);
+
+  return modal;
 }
 
 export function buildEscrowStatusEmbed({
@@ -209,7 +259,7 @@ export function buildEscrowStatusEmbed({
   sellerId,
   statusText = "Created",
   amountEth = "0",
-  color = 0x95a5a6,
+
   title = "📊 Escrow Status",
   description,
 } = {}) {
@@ -223,32 +273,32 @@ export function buildEscrowStatusEmbed({
     .setTitle(title)
     .setDescription(description ?? "Current escrow status and details.")
     .addFields(
-      { name: "🕓 Status", value: statusText, inline: false },
+      { name: "Status", value: statusText, inline: false },
       {
-        name: "💵 Amount",
+        name: "Amount",
         value: amountEth ? `${amountEth} ETH` : "—",
         inline: false,
       },
       {
-        name: "💰 Escrow",
+        name: "Escrow",
         value: escrowAddress ? `\`${escrowAddress}\`` : "—",
         inline: false,
       },
       {
-        name: "👤 Buyer",
+        name: "Buyer",
         value: buyerId ? `<@${buyerId}>` : "—",
         inline: true,
       },
       {
-        name: "🏷️ Seller",
+        name: "Seller",
         value: sellerId ? `<@${sellerId}>` : "—",
         inline: true,
       },
     )
-    .setColor(color);
+    .setColor(escrowEmbedColorForStatus(statusText));
 
   if (nextAction) {
-    embed.setFooter({ text: `🕓 Awaiting ${nextAction}` });
+    embed.setFooter({ text: `Awaiting ${nextAction}` });
   }
 
   return embed;
@@ -301,10 +351,14 @@ export function buildApproveReleaseRow() {
  */
 export function buildActionsForStatus(status) {
   const s = typeof status === "string" ? status.toLowerCase() : Number(status);
+
+  // Created, Completed, Cancelled, Disputed -> no actions
   if (s === 1 || s === "funded") {
+    // Funded -> Primary (blue) "Mark Delivered"
     return [buildMarkDeliveredRow()];
   }
   if (s === 2 || s === "delivered") {
+    // Delivered -> Success (green) "Approve & Release"
     return [buildApproveReleaseRow()];
   }
   return [];
