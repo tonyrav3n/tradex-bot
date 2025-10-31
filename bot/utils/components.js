@@ -140,7 +140,7 @@ export function buildVerifyButtonRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("verify_assign_role")
-      .setLabel("Verify")
+      .setLabel("✅ Verify")
       .setStyle(ButtonStyle.Success),
   );
 }

@@ -16,11 +16,6 @@ export const data = new SlashCommandBuilder()
       .setName("channel")
       .setDescription("Channel to post the Verify button in")
       .setRequired(true),
-  )
-  .addStringOption((opt) =>
-    opt
-      .setName("content")
-      .setDescription("Optional message to include above the Verify button"),
   );
 
 export async function execute(interaction) {
@@ -34,8 +29,7 @@ export async function execute(interaction) {
 
   const channel = interaction.options.getChannel("channel", true);
   const content =
-    interaction.options.getString("content") ||
-    "Click Verify to gain access.";
+    interaction.options.getString("content") || "Click Verify to gain access.";
 
   // Validate channel is sendable
   if (!channel || typeof channel.send !== "function") {
@@ -48,7 +42,6 @@ export async function execute(interaction) {
 
   try {
     const msg = await channel.send({
-      content,
       components: [buildVerifyButtonRow()],
     });
 
