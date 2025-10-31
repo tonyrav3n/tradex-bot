@@ -136,6 +136,15 @@ export function buildCreateThreadRow() {
   );
 }
 
+export function buildVerifyButtonRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("verify_assign_role")
+      .setLabel("Verify")
+      .setStyle(ButtonStyle.Success),
+  );
+}
+
 export function buildAgreeRow({
   buyerDisabled = false,
   sellerDisabled = false,

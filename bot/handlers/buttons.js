@@ -586,6 +586,58 @@ async function handleCancelCreateThread(client, interaction) {
   });
 }
 
+async function handleVerifyAssignRole(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const guild = interaction.guild;
+  if (!guild) {
+    await interaction.editReply({
+      content: "⚠️ This button must be used in a server.",
+    });
+    return;
+  }
+
+  const roleId = String(process.env.VERIFIED_ROLE_ID || "").trim();
+  if (!roleId) {
+    await interaction.editReply({
+      content:
+        "⚠️ VERIFIED_ROLE_ID is not configured. Please set it in the environment.",
+    });
+    return;
+  }
+
+  try {
+    const member =
+      interaction.member ?? (await guild.members.fetch(interaction.user.id));
+    const role =
+      guild.roles.cache.get(roleId) ||
+      (await guild.roles.fetch(roleId).catch(() => null));
+
+    if (!role) {
+      await interaction.editReply({
+        content: "⚠️ The verification role could not be found.",
+      });
+      return;
+    }
+
+    if (member.roles?.cache?.has(roleId)) {
+      await interaction.editReply({
+        content: "ℹ️ You are already verified.",
+      });
+      return;
+    }
+
+    await member.roles.add(roleId, "Verify button assignment");
+    await interaction.editReply({
+      content: "✅ You have been verified and the role has been assigned.",
+    });
+  } catch (e) {
+    await interaction.editReply({
+      content: `❌ Failed to assign the verification role: ${e?.message || e}`,
+    });
+  }
+}
+
 export async function handleButton(client, interaction) {
   const id = interaction.customId;
 
@@ -609,6 +661,8 @@ export async function handleButton(client, interaction) {
         return handleMarkDelivered(interaction);
       case "approve_release":
         return handleApproveRelease(interaction);
+      case "verify_assign_role":
+        return handleVerifyAssignRole(interaction);
       default:
         // No-op for unknown buttons
         return;

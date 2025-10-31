@@ -6,6 +6,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import { isAdmin } from "../utils/roles.js";
+import { COLORS } from "../utils/theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("say")
@@ -40,7 +41,9 @@ export const data = new SlashCommandBuilder()
       .addChannelOption((opt) =>
         opt
           .setName("channel")
-          .setDescription("What channel should I send this embedded message to?")
+          .setDescription(
+            "What channel should I send this embedded message to?",
+          )
           .setRequired(true),
       )
       .addStringOption((opt) =>
@@ -59,16 +62,34 @@ export const data = new SlashCommandBuilder()
           .addChoices(
             { name: "🟥 Red", value: "red" },
             { name: "🟩 Green", value: "green" },
-            { name: "🟦 Blue", value: "blue" },
+            { name: "🟦 Blue (Blurple)", value: "blue" },
             { name: "🟨 Yellow", value: "yellow" },
           ),
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("thumbnail_url")
+          .setDescription("Optional thumbnail image URL."),
+      )
+      .addStringOption((opt) =>
+        opt.setName("image_url").setDescription("Optional main image URL."),
+      )
+      .addStringOption((opt) =>
+        opt.setName("footer_text").setDescription("Optional footer text."),
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("footer_icon_url")
+          .setDescription("Optional footer icon URL."),
       ),
   )
   // /say dm
   .addSubcommand((sub) =>
     sub
       .setName("dm")
-      .setDescription("Sends a direct message to specified member. (Admin only)")
+      .setDescription(
+        "Sends a direct message to specified member. (Admin only)",
+      )
       .addUserOption((opt) =>
         opt
           .setName("member")
@@ -114,19 +135,32 @@ export async function execute(interaction) {
       const msgContent = interaction.options.getString("message", true);
       const header = interaction.options.getString("header") || undefined;
       const colorKey = interaction.options.getString("color") || "green";
+      const thumbnailUrl =
+        interaction.options.getString("thumbnail_url") || undefined;
+      const imageUrl = interaction.options.getString("image_url") || undefined;
+      const footerText =
+        interaction.options.getString("footer_text") || undefined;
+      const footerIcon =
+        interaction.options.getString("footer_icon_url") || undefined;
 
       const colorMap = {
-        red: Colors.Red,
-        green: Colors.Green,
-        blue: Colors.Blue,
-        yellow: Colors.Yellow,
+        red: COLORS.ALERT_RED,
+        green: COLORS.VERIFIED_GREEN,
+        blue: COLORS.BLURPLE,
+        yellow: 0xf1c40f,
       };
 
       const embed = new EmbedBuilder()
         .setDescription(msgContent)
-        .setColor(colorMap[colorKey] || Colors.Green);
-
+        .setColor(colorMap[colorKey] || COLORS.VERIFIED_GREEN);
       if (header) embed.setTitle(header);
+      if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
+      if (imageUrl) embed.setImage(imageUrl);
+      if (footerText || footerIcon)
+        embed.setFooter({
+          text: footerText || "",
+          iconURL: footerIcon || undefined,
+        });
 
       const sent = await channel.send({ embeds: [embed] });
       return interaction.reply({
