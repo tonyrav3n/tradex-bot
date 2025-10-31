@@ -13,7 +13,7 @@ export function buildTradeButton() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("create_trade_flow_button")
-      .setLabel("Create Trade")
+      .setLabel("Start a New Trade")
       .setStyle(ButtonStyle.Success),
   );
 }
@@ -21,20 +21,24 @@ export function buildTradeButton() {
 export function buildTradeEmbed() {
   return new EmbedBuilder()
     .setColor("#5865F2")
-    .setTitle("🪙 TradeX")
-    .setDescription("Ready to begin?\nClick below to create a trade.")
-    .setFooter({ text: "Built for trustless digital trading." });
+    .setTitle("Start a Secure Trade")
+    .setDescription(
+      "Ready to go? I'm here to help!\nClick below \
+      and I'll walk you through creating a secure, \
+      fair trade for you and your partner.",
+    )
+    .setFooter({ text: "amis. The digital handshake you can trust." });
 }
 
 export function buildRoleButtonsRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("role_buyer")
-      .setLabel("Buyer")
+      .setLabel("I'm Buying")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId("role_seller")
-      .setLabel("Seller")
+      .setLabel("I'm Selling")
       .setStyle(ButtonStyle.Primary),
   );
 }
@@ -42,7 +46,7 @@ export function buildRoleButtonsRow() {
 export function buildCounterpartySelectRow() {
   const select = new UserSelectMenuBuilder()
     .setCustomId("select_counterparty")
-    .setPlaceholder("Who's the counterparty?")
+    .setPlaceholder("Select your trading partner...")
     .setMinValues(1)
     .setMaxValues(1);
 
@@ -50,27 +54,29 @@ export function buildCounterpartySelectRow() {
 }
 
 export function buildDescriptionModal() {
-  const modal = new ModalBuilder()
-    .setCustomId("trade_description_modal")
-    .setTitle("Trade Details");
+  const desc = new TextInputBuilder({
+    custom_id: "trade_description",
+    label: "What are you trading? (Be as clear as possible)",
+    style: TextInputStyle.Paragraph,
+    required: true,
+    max_length: 500,
+  });
 
-  const desc = new TextInputBuilder()
-    .setCustomId("trade_description")
-    .setLabel("Describe the item")
-    .setStyle(TextInputStyle.Paragraph)
-    .setRequired(true)
-    .setMaxLength(500);
-
-  const price = new TextInputBuilder()
-    .setCustomId("trade_price_usd")
-    .setLabel("Price (USD)")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
+  const price = new TextInputBuilder({
+    custom_id: "trade_price_usd",
+    label: "What's the agreed price? (USD)",
+    style: TextInputStyle.Short,
+    required: true,
+  });
 
   const row1 = new ActionRowBuilder().addComponents(desc);
   const row2 = new ActionRowBuilder().addComponents(price);
-  modal.addComponents(row1, row2);
-  return modal;
+
+  return new ModalBuilder({
+    custom_id: "trade_description_modal",
+    title: "Trade Details",
+    components: [row1, row2],
+  });
 }
 
 export function buildConfirmationEmbed({
@@ -80,14 +86,16 @@ export function buildConfirmationEmbed({
   priceUsd,
 }) {
   return new EmbedBuilder()
-    .setTitle("💼 Confirm Trade Details")
-    .setDescription("Please review the details below before proceeding:\n\n")
+    .setTitle("Let's Double-Check!")
+    .setDescription(
+      "Please make sure everything is perfect. This will become the basis for our secure contract.:\n\n",
+    )
     .addFields(
       { name: "Buyer", value: `<@${buyerId}>`, inline: true },
-      { name: "Seller", value: `<@${sellerId}>`, inline: true },
-      { name: "Item", value: description, inline: false },
+      { name: "\nSeller", value: `<@${sellerId}>`, inline: true },
+      { name: "\nItem", value: description, inline: false },
       {
-        name: "Price (USD)",
+        name: "\nPrice (USD)",
         value: `$${priceUsd}`,
         inline: true,
       },
@@ -102,15 +110,17 @@ export function buildCreatedEmbed({
   priceUsd,
 }) {
   return new EmbedBuilder()
-    .setTitle("💼 Trade Summary")
-    .setDescription("Awaiting agreement from both parties:\n\n")
-    .addFields(
-      { name: "Buyer", value: `<@${buyerId}>`, inline: true },
-      { name: "Seller", value: `<@${sellerId}>`, inline: true },
-      { name: "Item", value: description, inline: false },
-      { name: "Price (USD)", value: `$${priceUsd}`, inline: true },
+    .setTitle("Trade Summary")
+    .setDescription(
+      "Please review the details below. Once you both agree, I'll ask the buyer to fund the trade.",
     )
-    .setFooter({ text: "🔐 Confirm to continue securely." })
+    .addFields(
+      { name: "\nBuyer", value: `<@${buyerId}>`, inline: true },
+      { name: "\nSeller", value: `<@${sellerId}>`, inline: true },
+      { name: "\nItem", value: description, inline: false },
+      { name: "\nPrice (USD)", value: `$${priceUsd}`, inline: true },
+    )
+    .setFooter({ text: "Final check." })
     .setColor("#2ecc71");
 }
 
@@ -118,7 +128,7 @@ export function buildCreateThreadRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("create_thread")
-      .setLabel("✅ Confirm")
+      .setLabel("✅ Looks Good")
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId("cancel_create_thread")
@@ -134,12 +144,12 @@ export function buildAgreeRow({
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("agree_buyer")
-      .setLabel("✅ Buyer Agree")
+      .setLabel("✅ I Agree (Buyer)")
       .setStyle(ButtonStyle.Success)
       .setDisabled(buyerDisabled),
     new ButtonBuilder()
       .setCustomId("agree_seller")
-      .setLabel("🛒 Seller Agree")
+      .setLabel("✅ I Agree (Seller)")
       .setStyle(ButtonStyle.Success)
       .setDisabled(sellerDisabled),
   );
@@ -164,31 +174,33 @@ export function buildProvideSellerAddressRow() {
 }
 
 export function buildBuyerAddressModal() {
-  const modal = new ModalBuilder()
-    .setCustomId("buyer_address_modal")
-    .setTitle("Buyer Address");
-  const input = new TextInputBuilder()
-    .setCustomId("buyer_address")
-    .setLabel("Your Address")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
+  const input = new TextInputBuilder({
+    custom_id: "buyer_address",
+    label: "Your Address",
+    style: TextInputStyle.Short,
+    required: true,
+  });
   const row = new ActionRowBuilder().addComponents(input);
-  modal.addComponents(row);
-  return modal;
+  return new ModalBuilder({
+    custom_id: "buyer_address_modal",
+    title: "Buyer Address",
+    components: [row],
+  });
 }
 
 export function buildSellerAddressModal() {
-  const modal = new ModalBuilder()
-    .setCustomId("seller_address_modal")
-    .setTitle("Seller Address");
-  const input = new TextInputBuilder()
-    .setCustomId("seller_address")
-    .setLabel("Your Address")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
+  const input = new TextInputBuilder({
+    custom_id: "seller_address",
+    label: "Your Address",
+    style: TextInputStyle.Short,
+    required: true,
+  });
   const row = new ActionRowBuilder().addComponents(input);
-  modal.addComponents(row);
-  return modal;
+  return new ModalBuilder({
+    custom_id: "seller_address_modal",
+    title: "Seller Address",
+    components: [row],
+  });
 }
 
 export function buildEscrowStatusEmbed({

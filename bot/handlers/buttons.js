@@ -80,7 +80,7 @@ async function handleStartFlow(client, interaction) {
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   await interaction.editReply({
-    content: "What is your role in this trade?",
+    content: "Great! To start, what's your side of the trade?",
     components: [buildRoleButtonsRow()],
   });
 }
@@ -101,7 +101,7 @@ async function handleSelectRole(interaction, role) {
   // Role buttons are in an ephemeral message; use deferUpdate to replace components
   await interaction.deferUpdate();
   await interaction.editReply({
-    content: "Select the counterparty:",
+    content: "Got it. Who are you trading with?",
     components: [buildCounterpartySelectRow()],
   });
 }
@@ -227,7 +227,7 @@ async function handleCreateThread(client, interaction) {
   const appId = client?.application?.id;
 
   const payload = {
-    content: `Head to the thread → <#${thread.id}> to proceed with your trade.`,
+    content: `Perfect. I've created a private thread for you and your partner. Let's head there to finalise the trade: → <#${thread.id}>`,
     components: [],
     embeds: [],
   };
