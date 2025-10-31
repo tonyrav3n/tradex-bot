@@ -158,6 +158,61 @@ export function assertSeller(uid, flow) {
   return { ok: true };
 }
 
+/**
+ * Check if a member/interaction has admin privilege.
+ * Returns true if:
+ * - The member has the Administrator permission; or
+ * - ADMIN_ROLE_ID is set in the environment and the member has that role.
+ *
+ * Accepts either a GuildMember, a CommandInteraction, or any object with:
+ * - memberPermissions.has(...)
+ * - member.roles.cache.has(...) or roles.cache.has(...)
+ *
+ * @param {any} memberOrInteraction
+ * @returns {boolean}
+ */
+export function isAdmin(memberOrInteraction) {
+  // Administrator permission (bit 3 -> 8n)
+  let hasAdminPermission = false;
+  try {
+    if (
+      typeof memberOrInteraction?.memberPermissions?.has === "function" &&
+      memberOrInteraction.memberPermissions.has(8n)
+    ) {
+      hasAdminPermission = true;
+    }
+  } catch {
+    // ignore
+  }
+
+  // Custom admin role via env
+  const envRoleId = String(process.env.ADMIN_ROLE_ID || "").trim();
+  let inAdminRole = false;
+  if (envRoleId) {
+    try {
+      const rolesCache =
+        memberOrInteraction?.member?.roles?.cache ??
+        memberOrInteraction?.roles?.cache ??
+        null;
+      if (rolesCache && typeof rolesCache.has === "function") {
+        inAdminRole = rolesCache.has(envRoleId);
+      } else {
+        const rolesArr =
+          memberOrInteraction?.member?.roles ??
+          memberOrInteraction?.roles ??
+          null;
+        if (Array.isArray(rolesArr)) {
+          inAdminRole = rolesArr.includes(envRoleId);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return hasAdminPermission || inAdminRole;
+}
+
 export default {
   resolveLockedRoles,
   getBuyerId,
@@ -166,4 +221,5 @@ export default {
   isSeller,
   assertBuyer,
   assertSeller,
+  isAdmin,
 };

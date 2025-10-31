@@ -1,11 +1,27 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
+import {
+  SlashCommandBuilder,
+  MessageFlags,
+  PermissionFlagsBits,
+} from "discord.js";
 import { query } from "../utils/db.js";
+import { isAdmin } from "../utils/roles.js";
 
 export const data = new SlashCommandBuilder()
   .setName("healthcheck")
-  .setDescription("Check database connectivity and basic readiness");
+  .setDescription("Check database connectivity and basic readiness")
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {
+  const allowed = isAdmin(interaction);
+
+  if (!allowed) {
+    await interaction.reply({
+      content: "This command is restricted to admins.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   const started = Date.now();
   let dbOk = false;
   let flowsOk = false;
