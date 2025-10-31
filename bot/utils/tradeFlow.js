@@ -25,11 +25,7 @@ import { createTrade } from "./createTrade.js";
 import { deriveEscrowAddressFromTx } from "./deriveEscrowAddress.js";
 import { getFlow, setFlow } from "./flowRepo.js";
 import { initEscrowStatusAndWatcher } from "./escrowStatus.js";
-import {
-  recordEscrowCreation,
-  setStatusMessageId,
-  markFunded,
-} from "./escrowRepo.js";
+import { recordEscrowCreation, setStatusMessageId } from "./escrowRepo.js";
 import { watchEscrowFunded } from "./escrow.js";
 
 /**
@@ -138,12 +134,8 @@ export async function createAndAnnounceTrade({
       try {
         watchEscrowFunded(
           escrowAddress,
-          async ({ amountWei }) => {
-            try {
-              await markFunded(escrowAddress, { amountWei });
-            } catch (err) {
-              console.error("DB markFunded failed:", err);
-            }
+          async () => {
+            // DB persistence handled by escrow status watcher
           },
           { emitOnStart: true },
         );
@@ -160,22 +152,16 @@ export async function createAndAnnounceTrade({
     // 6) Initialize the status embed + watcher
     if (escrowAddress) {
       try {
-        // Ensure the status embed shows USD price by default
-        let optionsToUse = initOptions ?? {};
-        if (!optionsToUse.initialDescription) {
-          try {
-            const flowForPrice = await getFlow(uid);
-            const usdPrice = flowForPrice?.priceUsd;
-            if (usdPrice != null) {
-              optionsToUse = {
-                ...optionsToUse,
-                initialDescription: `Price (USD): $${usdPrice}`,
-              };
-            }
-          } catch (eOpt) {
-            // log but continue
-            console.error("Failed to derive USD price for status embed:", eOpt);
+        // Pass explicit USD price to the status embed options
+        let optionsToUse = { ...(initOptions ?? {}) };
+        try {
+          const flowForPrice = await getFlow(uid);
+          const usdPrice = flowForPrice?.priceUsd;
+          if (usdPrice != null) {
+            optionsToUse.priceUsd = usdPrice;
           }
+        } catch (eOpt) {
+          console.error("Failed to derive USD price for status embed:", eOpt);
         }
 
         const { messageId } = await initEscrowStatusAndWatcher({

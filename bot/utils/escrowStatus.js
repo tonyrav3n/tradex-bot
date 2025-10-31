@@ -63,6 +63,7 @@ export async function initEscrowStatusAndWatcher({
     updatedDescription = "Buyer has funded",
     overrideBuyerId,
     overrideSellerId,
+    priceUsd,
   } = options;
 
   let messageId = null;
@@ -93,6 +94,7 @@ export async function initEscrowStatusAndWatcher({
         color: state?.color,
         title,
         description: initialDescription,
+        priceUsd,
       });
 
       const components = buildActionsForStatus(
@@ -161,6 +163,7 @@ export async function initEscrowStatusAndWatcher({
               color: updated?.color ?? 0x2ecc71, // default to "Funded" green if missing
               title,
               description: updatedDescription,
+              priceUsd,
             });
 
             const current = await getFlow(uid);

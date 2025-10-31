@@ -9,56 +9,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 
-const COLORS = Object.freeze({
-  VERIFIED_GREEN: 0x33d17a,
-  ALERT_RED: 0xed4245,
-  NEUTRAL_GREY: 0x2f3136,
-  BLURPLE: 0x5865f2,
-});
-
-function normalizeStatusLabel(status) {
-  if (typeof status === "number") {
-    switch (Number(status)) {
-      case 0:
-        return "created";
-      case 1:
-        return "funded";
-      case 2:
-        return "delivered";
-      case 3:
-        return "completed";
-      case 4:
-        return "cancelled";
-      case 5:
-        return "disputed";
-      default:
-        return "unknown";
-    }
-  }
-  if (typeof status === "string") {
-    return status.trim().toLowerCase();
-  }
-  return "unknown";
-}
-
-export function escrowEmbedColorForStatus(status) {
-  switch (normalizeStatusLabel(status)) {
-    case "created":
-      return COLORS.VERIFIED_GREEN;
-    case "funded":
-      return COLORS.BLURPLE;
-    case "delivered":
-      return COLORS.VERIFIED_GREEN;
-    case "completed":
-      return COLORS.NEUTRAL_GREY;
-    case "cancelled":
-    case "canceled":
-    case "disputed":
-      return COLORS.ALERT_RED;
-    default:
-      return COLORS.NEUTRAL_GREY;
-  }
-}
+import { COLORS, escrowEmbedColorForStatus } from "./theme.js";
 
 export function buildTradeButton() {
   return new ActionRowBuilder().addComponents(
@@ -74,11 +25,9 @@ export function buildTradeEmbed() {
     .setColor(COLORS.VERIFIED_GREEN)
     .setTitle("🛡️ Start a Secure Trade")
     .setDescription(
-      `Ready to go? I'm here to help!\nClick below
-      and I'll walk you through creating a secure,\n
-      fair trade for you and your partner.`.replace(/\n\s+/g, " "),
+      "Ready to go? I'm here to help! Click below and I'll walk you through creating a secure, fair trade for you and your partner.",
     )
-    .setFooter({ text: "amis.. The digital handshake you can trust." });
+    .setFooter({ text: "amis. The digital handshake you can trust." });
 }
 
 export function buildRoleButtonsRow() {
@@ -259,6 +208,7 @@ export function buildEscrowStatusEmbed({
   sellerId,
   statusText = "Created",
   amountEth = "0",
+  priceUsd,
 
   title = "📊 Escrow Status",
   description,
@@ -269,10 +219,6 @@ export function buildEscrowStatusEmbed({
   else if (s === "funded") nextAction = "seller to deliver";
   else if (s === "delivered") nextAction = "buyer to approve & release";
 
-  const usdPrice =
-    typeof description === "string"
-      ? description.match(/\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)/)?.[1] || null
-      : null;
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(description ?? "Current escrow status and details.")
@@ -280,7 +226,7 @@ export function buildEscrowStatusEmbed({
       { name: "\nStatus", value: statusText, inline: false },
       {
         name: "\nPrice (USD)",
-        value: usdPrice ? `$${usdPrice}` : "—",
+        value: priceUsd ? `$${priceUsd}` : "—",
         inline: false,
       },
       {
