@@ -160,11 +160,29 @@ export async function createAndAnnounceTrade({
     // 6) Initialize the status embed + watcher
     if (escrowAddress) {
       try {
+        // Ensure the status embed shows USD price by default
+        let optionsToUse = initOptions ?? {};
+        if (!optionsToUse.initialDescription) {
+          try {
+            const flowForPrice = await getFlow(uid);
+            const usdPrice = flowForPrice?.priceUsd;
+            if (usdPrice != null) {
+              optionsToUse = {
+                ...optionsToUse,
+                initialDescription: `Price (USD): $${usdPrice}`,
+              };
+            }
+          } catch (eOpt) {
+            // log but continue
+            console.error("Failed to derive USD price for status embed:", eOpt);
+          }
+        }
+
         const { messageId } = await initEscrowStatusAndWatcher({
           channel,
           uid,
           escrowAddress,
-          options: initOptions ?? {},
+          options: optionsToUse,
         });
         if (messageId) {
           try {

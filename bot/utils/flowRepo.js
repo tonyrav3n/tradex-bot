@@ -54,6 +54,11 @@ function rowToFlow(row) {
       row.price_usd !== null && row.price_usd !== undefined
         ? String(row.price_usd)
         : null,
+    priceEthAtCreation:
+      row.price_eth_at_creation !== null &&
+      row.price_eth_at_creation !== undefined
+        ? String(row.price_eth_at_creation)
+        : null,
 
     // agreements
     buyerAgreed: Boolean(row.buyer_agreed),
@@ -98,6 +103,7 @@ function baseFlow(userId) {
 
     description: null,
     priceUsd: null,
+    priceEthAtCreation: null,
 
     buyerAgreed: false,
     sellerAgreed: false,
@@ -146,6 +152,9 @@ function flowToValues(flow, userId) {
     flow.priceUsd !== undefined && flow.priceUsd !== null
       ? String(flow.priceUsd)
       : null,
+    flow.priceEthAtCreation !== undefined && flow.priceEthAtCreation !== null
+      ? String(flow.priceEthAtCreation)
+      : null,
 
     Boolean(flow.buyerAgreed),
     Boolean(flow.sellerAgreed),
@@ -176,6 +185,7 @@ const columns = [
   "original_interaction_token",
   "description",
   "price_usd",
+  "price_eth_at_creation",
   "buyer_agreed",
   "seller_agreed",
   "buyer_address",
@@ -307,6 +317,10 @@ export async function setPrice(userId, priceUsd) {
   return setFlow(userId, { priceUsd });
 }
 
+export async function setPriceEthAtCreation(userId, priceEthAtCreation) {
+  return setFlow(userId, { priceEthAtCreation });
+}
+
 export async function markBuyerAgreed(userId) {
   return setFlow(userId, { buyerAgreed: true });
 }
@@ -375,6 +389,7 @@ export default {
   resetAllFlows,
   dumpFlows,
   setPrice,
+  setPriceEthAtCreation,
   markBuyerAgreed,
   markSellerAgreed,
   setBuyerAddress,

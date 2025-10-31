@@ -19,6 +19,7 @@ import {
   setPrice,
   setBuyerAddress,
   setSellerAddress,
+  setPriceEthAtCreation,
 } from "../utils/flowRepo.js";
 import {
   buildConfirmationEmbed,
@@ -27,6 +28,7 @@ import {
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { createAndAnnounceTrade } from "../utils/tradeFlow.js";
+import { convertUsdToEth } from "../utils/fx.js";
 import { normalizeAndValidateAddress } from "../utils/validation.js";
 import {
   resolveLockedRoles,
@@ -171,12 +173,44 @@ async function handleBuyerAddressModal(client, interaction) {
       return;
     }
     try {
-      await createAndAnnounceTrade({
+      // Pin ETH at creation from USD price and store
+      const priceUsdStr = String(f?.priceUsd ?? "0");
+      let pinnedEth = null;
+      try {
+        const conv = await convertUsdToEth(priceUsdStr);
+        pinnedEth = conv.eth;
+        await setPriceEthAtCreation(uid, pinnedEth);
+        if (f?.counterpartyId) {
+          await setPriceEthAtCreation(f.counterpartyId, pinnedEth);
+        }
+      } catch (e2) {
+        console.error("Failed to pin ETH at creation:", e2);
+      }
+
+      const result = await createAndAnnounceTrade({
         channel: interaction.channel,
         uid,
         buyerAddress: f.buyerAddress,
         sellerAddress: f.sellerAddress,
+        amountEth: pinnedEth ?? undefined,
+        initOptions: {
+          initialDescription: `Price (USD): $${priceUsdStr}`,
+        },
       });
+
+      try {
+        const freshFlow = await getFlow(uid);
+        const { buyerId } = resolveLockedRoles(freshFlow, uid);
+        const usdDisplay = priceUsdStr;
+        const ethDisplay = pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
+        if (result?.escrowAddress && buyerId) {
+          await interaction.channel.send({
+            content: `💸 <@${buyerId}> Please fund the escrow by sending ${ethDisplay} ETH (~$${usdDisplay} USD) to \`${result.escrowAddress}\`.`,
+          });
+        }
+      } catch (e2) {
+        console.error("Funding prompt failed:", e2);
+      }
     } catch (e) {
       await interaction.channel.send({
         content: `❌ Failed to create trade: ${e.message}`,
@@ -274,12 +308,44 @@ async function handleSellerAddressModal(client, interaction) {
       return;
     }
     try {
-      await createAndAnnounceTrade({
+      // Pin ETH at creation from USD price and store
+      const priceUsdStr = String(f?.priceUsd ?? "0");
+      let pinnedEth = null;
+      try {
+        const conv = await convertUsdToEth(priceUsdStr);
+        pinnedEth = conv.eth;
+        await setPriceEthAtCreation(uid, pinnedEth);
+        if (f?.counterpartyId) {
+          await setPriceEthAtCreation(f.counterpartyId, pinnedEth);
+        }
+      } catch (e2) {
+        console.error("Failed to pin ETH at creation:", e2);
+      }
+
+      const result = await createAndAnnounceTrade({
         channel: interaction.channel,
         uid,
         buyerAddress: f.buyerAddress,
         sellerAddress: f.sellerAddress,
+        amountEth: pinnedEth ?? undefined,
+        initOptions: {
+          initialDescription: `Price (USD): $${priceUsdStr}`,
+        },
       });
+
+      try {
+        const freshFlow = await getFlow(uid);
+        const { buyerId } = resolveLockedRoles(freshFlow, uid);
+        const usdDisplay = priceUsdStr;
+        const ethDisplay = pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
+        if (result?.escrowAddress && buyerId) {
+          await interaction.channel.send({
+            content: `💸 <@${buyerId}> Please fund the escrow by sending ${ethDisplay} ETH (~$${usdDisplay} USD) to \`${result.escrowAddress}\`.`,
+          });
+        }
+      } catch (e2) {
+        console.error("Funding prompt failed:", e2);
+      }
     } catch (e) {
       await interaction.channel.send({
         content: `❌ Failed to create trade: ${e.message}`,

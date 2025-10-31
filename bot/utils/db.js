@@ -39,7 +39,7 @@ export function getPool() {
 
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL (or POSTGRES_URL) is not set. Configure your Postgres connection string."
+      "DATABASE_URL (or POSTGRES_URL) is not set. Configure your Postgres connection string.",
     );
   }
 
@@ -49,12 +49,12 @@ export function getPool() {
     idleTimeoutMillis: parseInt(process.env.PGPOOL_IDLE || "30000", 10),
     connectionTimeoutMillis: parseInt(
       process.env.PGPOOL_CONNECT_TIMEOUT || "10000",
-      10
+      10,
     ),
     ssl: resolveSslConfig(connectionString),
   });
 
-  poolInstance.on("connect", () => {
+  poolInstance.once("connect", () => {
     console.log("✅ Connected to PostgreSQL");
   });
   poolInstance.on("error", (err) => {
@@ -135,7 +135,7 @@ async function ensureMigrationsTable(client) {
  */
 async function getAppliedMigrations(client) {
   const res = await client.query(
-    `SELECT name, checksum FROM migrations ORDER BY id ASC`
+    `SELECT name, checksum FROM migrations ORDER BY id ASC`,
   );
   const map = new Map();
   for (const row of res.rows) {
@@ -167,7 +167,7 @@ function loadMigrationFiles(dir) {
       (f) =>
         f.toLowerCase().endsWith(".sql") &&
         !f.startsWith(".") &&
-        fs.statSync(path.join(dir, f)).isFile()
+        fs.statSync(path.join(dir, f)).isFile(),
     )
     .sort((a, b) => a.localeCompare(b));
 
@@ -192,7 +192,7 @@ async function applyMigration(client, migration) {
 
     await client.query(
       `INSERT INTO migrations (name, checksum) VALUES ($1, $2)`,
-      [migration.name, migration.checksum]
+      [migration.name, migration.checksum],
     );
 
     await client.query("COMMIT");
@@ -228,7 +228,7 @@ export async function runMigrations(options = {}) {
         const prev = applied.get(mig.name);
         if (prev && prev !== mig.checksum) {
           console.warn(
-            `⚠️ Migration '${mig.name}' checksum changed. Already applied: ${prev}, now: ${mig.checksum}. Skipping.`
+            `⚠️ Migration '${mig.name}' checksum changed. Already applied: ${prev}, now: ${mig.checksum}. Skipping.`,
           );
         } else {
           console.log(`⏭️  Skipping already applied: ${mig.name}`);

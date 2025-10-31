@@ -75,7 +75,7 @@ export function buildTradeEmbed() {
     .setTitle("🛡️ Start a Secure Trade")
     .setDescription(
       `Ready to go? I'm here to help!\nClick below
-      and I'll walk you through creating a secure,
+      and I'll walk you through creating a secure,\n
       fair trade for you and your partner.`.replace(/\n\s+/g, " "),
     )
     .setFooter({ text: "amis.. The digital handshake you can trust." });
@@ -97,7 +97,7 @@ export function buildRoleButtonsRow() {
 export function buildCounterpartySelectRow() {
   const select = new UserSelectMenuBuilder()
     .setCustomId("select_counterparty")
-    .setPlaceholder("Select your trading partner...")
+    .setPlaceholder("Select the counterparty...")
     .setMinValues(1)
     .setMaxValues(1);
 
@@ -107,14 +107,14 @@ export function buildCounterpartySelectRow() {
 export function buildDescriptionModal() {
   const desc = new TextInputBuilder()
     .setCustomId("trade_description")
-    .setLabel("What are you trading? (Be as clear as possible)")
+    .setLabel("What are you trading?")
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(true)
     .setMaxLength(500);
 
   const price = new TextInputBuilder()
     .setCustomId("trade_price_usd")
-    .setLabel("What's the agreed price? (USD)")
+    .setLabel("Agreed price (USD)")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -138,10 +138,10 @@ export function buildConfirmationEmbed({
   return new EmbedBuilder()
     .setTitle("✅ Let's Double-Check!")
     .setDescription(
-      "Please make sure everything is perfect. This will become the basis for our secure contract.:\n\n",
+      "Please make sure everything is perfect. This will become the basis for our secure contract.\n\n",
     )
     .addFields(
-      { name: "Buyer", value: `<@${buyerId}>`, inline: true },
+      { name: "\nBuyer", value: `<@${buyerId}>`, inline: true },
       { name: "\nSeller", value: `<@${sellerId}>`, inline: true },
       { name: "\nItem", value: description, inline: false },
       {
@@ -269,28 +269,37 @@ export function buildEscrowStatusEmbed({
   else if (s === "funded") nextAction = "seller to deliver";
   else if (s === "delivered") nextAction = "buyer to approve & release";
 
+  const usdPrice =
+    typeof description === "string"
+      ? description.match(/\$([0-9][0-9,]*(?:\.[0-9]{1,2})?)/)?.[1] || null
+      : null;
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(description ?? "Current escrow status and details.")
     .addFields(
-      { name: "Status", value: statusText, inline: false },
+      { name: "\nStatus", value: statusText, inline: false },
       {
-        name: "Amount",
-        value: amountEth ? `${amountEth} ETH` : "—",
+        name: "\nPrice (USD)",
+        value: usdPrice ? `$${usdPrice}` : "—",
         inline: false,
       },
       {
-        name: "Escrow",
+        name: "\nAmount (ETH)",
+        value: amountEth ? `${amountEth} ETH` : "—",
+        inline: true,
+      },
+      {
+        name: "\nEscrow",
         value: escrowAddress ? `\`${escrowAddress}\`` : "—",
         inline: false,
       },
       {
-        name: "Buyer",
+        name: "\nBuyer",
         value: buyerId ? `<@${buyerId}>` : "—",
         inline: true,
       },
       {
-        name: "Seller",
+        name: "\nSeller",
         value: sellerId ? `<@${sellerId}>` : "—",
         inline: true,
       },
