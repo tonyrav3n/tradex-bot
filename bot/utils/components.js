@@ -74,11 +74,11 @@ export function buildTradeEmbed() {
     .setColor(COLORS.VERIFIED_GREEN)
     .setTitle("🛡️ Start a Secure Trade")
     .setDescription(
-      "Ready to go? I'm here to help!\nClick below\
-    and I'll walk you through creating a secure,\
-    fair trade for you and your partner.",
+      `Ready to go? I'm here to help!\nClick below
+      and I'll walk you through creating a secure,
+      fair trade for you and your partner.`.replace(/\n\s+/g, " "),
     )
-    .setFooter({ text: "amis. The digital handshake you can trust." });
+    .setFooter({ text: "amis.. The digital handshake you can trust." });
 }
 
 export function buildRoleButtonsRow() {
