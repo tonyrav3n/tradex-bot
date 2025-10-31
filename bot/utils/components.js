@@ -75,8 +75,8 @@ export function buildTradeEmbed() {
     .setTitle("🛡️ Start a Secure Trade")
     .setDescription(
       "Ready to go? I'm here to help!\nClick below\
-      and I'll walk you through creating a secure,\
-      fair trade for you and your partner.",
+    and I'll walk you through creating a secure,\
+    fair trade for you and your partner.",
     )
     .setFooter({ text: "amis. The digital handshake you can trust." });
 }
