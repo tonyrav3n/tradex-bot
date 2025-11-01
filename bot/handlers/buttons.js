@@ -629,7 +629,7 @@ async function handleVerifyAssignRole(interaction) {
 
     await member.roles.add(roleId, "Verify button assignment");
     await interaction.editReply({
-      content: "✅ You have been verified and the role has been assigned.",
+      content: "✅ You have been verified and now have access to the server!.",
     });
   } catch (e) {
     await interaction.editReply({

@@ -9,7 +9,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 
-import { COLORS, escrowEmbedColorForStatus } from "./theme.js";
+import { COLORS, escrowEmbedColorForStatus, ASSETS } from "./theme.js";
 
 export function buildTradeButton() {
   return new ActionRowBuilder().addComponents(
@@ -25,9 +25,14 @@ export function buildTradeEmbed() {
     .setColor(COLORS.VERIFIED_GREEN)
     .setTitle("🛡️ Start a Secure Trade")
     .setDescription(
-      "Ready to go? I'm here to help! Click below and I'll walk you through creating a secure, fair trade for you and your partner.",
+      "Ready to go? I'm here to help! \nClick below and I'll walk you through creating a secure, fair trade for you and your partner.",
     )
-    .setFooter({ text: "amis. The digital handshake you can trust." });
+    .setThumbnail(ASSETS.LOGO_URL)
+    .setImage(ASSETS.BANNER_URL)
+    .setFooter({
+      text: "amis.",
+      iconURL: ASSETS.LOGO_URL,
+    });
 }
 
 export function buildRoleButtonsRow() {
@@ -143,6 +148,16 @@ export function buildVerifyButtonRow() {
       .setLabel("✅ Verify")
       .setStyle(ButtonStyle.Success),
   );
+}
+
+export function buildVerifyEmbed() {
+  return new EmbedBuilder()
+    .setColor(COLORS.VERIFIED_GREEN)
+    .setTitle("👋 Welcome to amis.!")
+    .setDescription("Click on the button below to gain access.")
+    .setThumbnail(ASSETS.LOGO_URL)
+    .setImage(ASSETS.BANNER_URL)
+    .setFooter({ text: "amis.", iconURL: ASSETS.LOGO_URL });
 }
 
 export function buildAgreeRow({

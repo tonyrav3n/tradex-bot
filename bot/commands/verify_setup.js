@@ -4,7 +4,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import { isAdmin } from "../utils/roles.js";
-import { buildVerifyButtonRow } from "../utils/components.js";
+import { buildVerifyButtonRow, buildVerifyEmbed } from "../utils/components.js";
 
 export const data = new SlashCommandBuilder()
   .setName("verify_setup")
@@ -28,8 +28,6 @@ export async function execute(interaction) {
   }
 
   const channel = interaction.options.getChannel("channel", true);
-  const content =
-    interaction.options.getString("content") || "Click Verify to gain access.";
 
   // Validate channel is sendable
   if (!channel || typeof channel.send !== "function") {
@@ -42,6 +40,7 @@ export async function execute(interaction) {
 
   try {
     const msg = await channel.send({
+      embeds: [buildVerifyEmbed()],
       components: [buildVerifyButtonRow()],
     });
 

@@ -6,7 +6,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import { isAdmin } from "../utils/roles.js";
-import { COLORS } from "../utils/theme.js";
+import { COLORS, ASSETS } from "../utils/theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("say")
@@ -66,21 +66,15 @@ export const data = new SlashCommandBuilder()
             { name: "🟨 Yellow", value: "yellow" },
           ),
       )
-      .addStringOption((opt) =>
+      .addBooleanOption((opt) =>
         opt
-          .setName("thumbnail_url")
-          .setDescription("Optional thumbnail image URL."),
+          .setName("include_thumbnail")
+          .setDescription("Include logo thumbnail in the embed"),
       )
-      .addStringOption((opt) =>
-        opt.setName("image_url").setDescription("Optional main image URL."),
-      )
-      .addStringOption((opt) =>
-        opt.setName("footer_text").setDescription("Optional footer text."),
-      )
-      .addStringOption((opt) =>
+      .addBooleanOption((opt) =>
         opt
-          .setName("footer_icon_url")
-          .setDescription("Optional footer icon URL."),
+          .setName("include_banner")
+          .setDescription("Include banner image in the embed"),
       ),
   )
   // /say dm
@@ -135,13 +129,10 @@ export async function execute(interaction) {
       const msgContent = interaction.options.getString("message", true);
       const header = interaction.options.getString("header") || undefined;
       const colorKey = interaction.options.getString("color") || "green";
-      const thumbnailUrl =
-        interaction.options.getString("thumbnail_url") || undefined;
-      const imageUrl = interaction.options.getString("image_url") || undefined;
-      const footerText =
-        interaction.options.getString("footer_text") || undefined;
-      const footerIcon =
-        interaction.options.getString("footer_icon_url") || undefined;
+      const includeThumb =
+        interaction.options.getBoolean("include_thumbnail") ?? false;
+      const includeBanner =
+        interaction.options.getBoolean("include_banner") ?? false;
 
       const colorMap = {
         red: COLORS.ALERT_RED,
@@ -154,13 +145,9 @@ export async function execute(interaction) {
         .setDescription(msgContent)
         .setColor(colorMap[colorKey] || COLORS.VERIFIED_GREEN);
       if (header) embed.setTitle(header);
-      if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
-      if (imageUrl) embed.setImage(imageUrl);
-      if (footerText || footerIcon)
-        embed.setFooter({
-          text: footerText || "",
-          iconURL: footerIcon || undefined,
-        });
+      if (includeThumb) embed.setThumbnail(ASSETS.LOGO_URL);
+      if (includeBanner) embed.setImage(ASSETS.BANNER_URL);
+      embed.setFooter({ text: "amis.", iconURL: ASSETS.LOGO_URL });
 
       const sent = await channel.send({ embeds: [embed] });
       return interaction.reply({
