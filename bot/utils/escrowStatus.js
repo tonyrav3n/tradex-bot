@@ -184,8 +184,43 @@ export async function initEscrowStatusAndWatcher({
                 ).toLowerCase();
                 if (updatedLabel === "funded" && sellerId) {
                   try {
+                    const amountEthNum = parseFloat(
+                      String(updated?.amountEth ?? "0"),
+                    );
+                    const payoutEth = Number.isFinite(amountEthNum)
+                      ? amountEthNum * 0.975
+                      : null;
+                    const payoutEthStr =
+                      payoutEth != null
+                        ? Number(payoutEth)
+                            .toFixed(6)
+                            .replace(/(\.\d*?[1-9])0+$/u, "$1")
+                            .replace(/\.0+$/u, ".0")
+                            .replace(/\.$/u, "")
+                        : null;
+
+                    const baseUsdNum =
+                      priceUsd != null
+                        ? parseFloat(String(priceUsd).replace(/,/g, ""))
+                        : null;
+                    const payoutUsdStr =
+                      baseUsdNum != null && Number.isFinite(baseUsdNum)
+                        ? (baseUsdNum * 0.975)
+                            .toFixed(2)
+                            .replace(/(\.\d*?[1-9])0+$/u, "$1")
+                            .replace(/\.0+$/u, ".0")
+                            .replace(/\.$/u, "")
+                        : null;
+
+                    const payoutLine =
+                      payoutEthStr && payoutUsdStr
+                        ? ` Seller will receive ~ ${payoutEthStr} ETH (~$${payoutUsdStr}) after 2.5% fee.`
+                        : payoutEthStr
+                          ? ` Seller will receive ~ ${payoutEthStr} ETH after 2.5% fee.`
+                          : "";
+
                     await channel.send({
-                      content: `<@${sellerId}> Buyer has funded. Please deliver and click the 'Mark Delivered' button.`,
+                      content: `<@${sellerId}> Buyer has funded.${payoutLine} Please deliver and click the 'Mark Delivered' button.`,
                       allowedMentions: { users: [String(sellerId)], parse: [] },
                     });
                   } catch (e3) {

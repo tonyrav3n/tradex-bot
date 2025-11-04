@@ -1,104 +1,10 @@
 import { publicClient, walletClient } from "./client.js";
 import { formatEther } from "viem";
 import { escrowEmbedColorForStatus } from "./theme.js";
+import { ESCROW_ABI } from "./escrowContract.js";
+import { buildEtherscanAddressUrl, buildEtherscanTxUrl } from "./format.js";
 
-/**
- * Minimal Escrow ABI for reading and event watching.
- * Matches contracts/TradeNestEscrow.sol
- */
-export const ESCROW_ABI = [
-  // Events
-  {
-    type: "event",
-    name: "Funded",
-    inputs: [
-      { indexed: true, name: "buyer", type: "address" },
-      { indexed: false, name: "amount", type: "uint256" },
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "Delivered",
-    inputs: [{ indexed: true, name: "seller", type: "address" }],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "Approved",
-    inputs: [{ indexed: true, name: "buyer", type: "address" }],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "Released",
-    inputs: [
-      { indexed: true, name: "to", type: "address" },
-      { indexed: false, name: "amount", type: "uint256" },
-    ],
-    anonymous: false,
-  },
-
-  // Views
-  {
-    type: "function",
-    stateMutability: "view",
-    name: "buyer",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
-  {
-    type: "function",
-    stateMutability: "view",
-    name: "seller",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
-  {
-    type: "function",
-    stateMutability: "view",
-    name: "amount",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    type: "function",
-    stateMutability: "view",
-    name: "status",
-    inputs: [],
-    outputs: [{ name: "", type: "uint8" }],
-  },
-
-  // Functions (for reference and potential writes)
-  {
-    type: "function",
-    stateMutability: "payable",
-    name: "fund",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    stateMutability: "nonpayable",
-    name: "markDelivered",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    stateMutability: "nonpayable",
-    name: "approveDelivery",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    stateMutability: "nonpayable",
-    name: "releaseAfterTimeout",
-    inputs: [],
-    outputs: [],
-  },
-];
+/* ABI is now loaded from JSON artifact via escrowContract.js */
 
 // Matches TradeStatus enum in TradeNestEscrow.sol
 export const ESCROW_STATUS = Object.freeze({
@@ -166,35 +72,62 @@ export async function getEscrowParties(escrowAddress) {
 }
 
 export async function getEscrowState(escrowAddress) {
-  const [buyer, seller, amountWei, status] = await Promise.all([
-    publicClient.readContract({
-      address: escrowAddress,
-      abi: ESCROW_ABI,
-      functionName: "buyer",
-      args: [],
-    }),
-    publicClient.readContract({
-      address: escrowAddress,
-      abi: ESCROW_ABI,
-      functionName: "seller",
-      args: [],
-    }),
-    publicClient.readContract({
-      address: escrowAddress,
-      abi: ESCROW_ABI,
-      functionName: "amount",
-      args: [],
-    }),
-    publicClient.readContract({
-      address: escrowAddress,
-      abi: ESCROW_ABI,
-      functionName: "status",
-      args: [],
-    }),
-  ]);
+  const [buyer, seller, amountWei, status, deliveryTs, releaseTo] =
+    await Promise.all([
+      publicClient.readContract({
+        address: escrowAddress,
+        abi: ESCROW_ABI,
+        functionName: "buyer",
+        args: [],
+      }),
+      publicClient.readContract({
+        address: escrowAddress,
+        abi: ESCROW_ABI,
+        functionName: "seller",
+        args: [],
+      }),
+      publicClient.readContract({
+        address: escrowAddress,
+        abi: ESCROW_ABI,
+        functionName: "amount",
+        args: [],
+      }),
+      publicClient.readContract({
+        address: escrowAddress,
+        abi: ESCROW_ABI,
+        functionName: "status",
+        args: [],
+      }),
+      publicClient.readContract({
+        address: escrowAddress,
+        abi: ESCROW_ABI,
+        functionName: "deliveryTimestamp",
+        args: [],
+      }),
+      publicClient.readContract({
+        address: escrowAddress,
+        abi: ESCROW_ABI,
+        functionName: "releaseTimeout",
+        args: [],
+      }),
+    ]);
 
   const statusNum = Number(status);
   const amountEth = formatEther(amountWei ?? 0n);
+
+  const deliveredAtSec = Number(deliveryTs ?? 0n);
+  const releaseTimeoutSec = Number(releaseTo ?? 0n);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const deadlineSec =
+    deliveredAtSec > 0 && releaseTimeoutSec > 0
+      ? deliveredAtSec + releaseTimeoutSec
+      : null;
+  const secondsLeft =
+    deadlineSec !== null ? Math.max(0, deadlineSec - nowSec) : null;
+  const canReleaseByTimeout =
+    statusNum === ESCROW_STATUS.Delivered &&
+    deadlineSec !== null &&
+    nowSec >= deadlineSec;
 
   return {
     buyer,
@@ -204,6 +137,14 @@ export async function getEscrowState(escrowAddress) {
     status: statusNum,
     statusText: statusLabel(statusNum),
     color: escrowEmbedColorForStatus(statusNum),
+    // countdown-related fields
+    deliveredAtSec,
+    releaseTimeoutSec,
+    deadlineSec,
+    secondsLeft,
+    canReleaseByTimeout,
+    // explorer link for convenience in UIs
+    addressUrl: buildEtherscanAddressUrl(escrowAddress),
   };
 }
 
@@ -224,7 +165,8 @@ export function watchEscrowFunded(escrowAddress, handler, options = {}) {
         const amountWei = log.args?.amount ?? 0n;
         const amountEth = formatEther(amountWei);
         const txHash = log.transactionHash;
-        await handler({ buyer, amountWei, amountEth, txHash });
+        const txUrl = buildEtherscanTxUrl(txHash);
+        await handler({ buyer, amountWei, amountEth, txHash, txUrl });
       }
     },
     onError: (err) => {

@@ -6,6 +6,7 @@ import "./TradeNestEscrow.sol";
 contract TradeNestFactory {
     TradeNestEscrow[] public escrows;
     address public bot;
+    address public feeReceiver;
 
     event EscrowCreated(
         address indexed escrowAddress,
@@ -13,9 +14,17 @@ contract TradeNestFactory {
         address indexed seller
     );
 
-    constructor(address _bot) {
+    constructor(address _bot, address _feeReceiver) {
         require(_bot != address(0), "invalid bot address");
+        require(_feeReceiver != address(0), "invalid fee receiver address");
         bot = _bot;
+        feeReceiver = _feeReceiver;
+    }
+
+    function setFeeReceiver(address _newReceiver) external {
+        require(msg.sender == bot, "Only bot can change fee receiver");
+        require(_newReceiver != address(0), "zero addr");
+        feeReceiver = _newReceiver;
     }
 
     function createEscrow(
@@ -28,8 +37,7 @@ contract TradeNestFactory {
         );
         require(_buyer != _seller, "buyer and seller cannot be same");
 
-        // Pass bot address into escrow
-        TradeNestEscrow escrow = new TradeNestEscrow(_buyer, _seller, bot);
+        TradeNestEscrow escrow = new TradeNestEscrow(_buyer, _seller, bot, feeReceiver);
         escrows.push(escrow);
 
         emit EscrowCreated(address(escrow), _buyer, _seller);

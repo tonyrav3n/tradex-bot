@@ -7,9 +7,9 @@ dotenv.config();
 /**
  * Contract utils to load the TradeNestFactory address and ABI.
  *
- * Priority:
- * 1) FACTORY_ADDRESS and FACTORY_ABI_PATH from .env (explicit overrides)
- * 2) Fallback ABI from bot/abi/TradeNestFactory.json
+ * Uses FACTORY_ADDRESS from .env for address.
+ * ABI is always loaded from bot/abi/TradeNestFactory.json
+ *
  */
 
 const ROOT = process.cwd();
@@ -46,15 +46,12 @@ function loadFactoryAddress() {
 }
 
 function loadFactoryAbi() {
-  // 1) resolve artifact path (env override or default)
-  const envArtifactPath =
-    process.env.FACTORY_ABI_PATH || process.env.FACTORY_ARTIFACT_PATH;
-  const artifactPath = envArtifactPath || DEFAULT_ARTIFACT_PATH;
+  const artifactPath = DEFAULT_ARTIFACT_PATH;
 
   if (!fileExists(artifactPath)) {
     throw new Error(
       `Factory artifact not found at ${artifactPath}.
-- Ensure bot/abi/TradeNestFactory.json exists or set FACTORY_ABI_PATH to a valid file.`,
+- Ensure bot/abi/TradeNestFactory.json exists.`,
     );
   }
 

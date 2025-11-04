@@ -212,10 +212,30 @@ async function handleBuyerAddressModal(client, interaction) {
         const freshFlow = await getFlow(uid);
         const { buyerId } = resolveLockedRoles(freshFlow, uid);
         const usdDisplay = priceUsdStr;
-        const ethDisplay = pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
+        const baseEthStr = pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
+        const baseEthNum = parseFloat(String(baseEthStr));
+        const buyerFeeEthNum = Number.isFinite(baseEthNum)
+          ? baseEthNum * 0.025
+          : null;
+        const buyerTotalEthNum = Number.isFinite(baseEthNum)
+          ? baseEthNum * 1.025
+          : null;
+        const fmt = (n, d = 6) =>
+          n != null && Number.isFinite(n)
+            ? Number(n)
+                .toFixed(d)
+                .replace(/(\.\d*?[1-9])0+$/u, "$1")
+                .replace(/\.0+$/u, ".0")
+                .replace(/\.$/u, "")
+            : "0";
         if (result?.escrowAddress && buyerId) {
           await interaction.channel.send({
-            content: `💸 <@${buyerId}> Please fund the escrow by sending ${ethDisplay} ETH (~$${usdDisplay} USD) to \`${result.escrowAddress}\`.`,
+            content:
+              `💸 <@${buyerId}> Funding details:\n` +
+              `• Escrow amount (base): ${fmt(baseEthNum)} ETH (~$${usdDisplay})\n` +
+              `• Buyer fee (2.5%): ${fmt(buyerFeeEthNum)} ETH\n` +
+              `• Total to send: ${fmt(buyerTotalEthNum)} ETH\n` +
+              `Send to: \`${result.escrowAddress}\``,
           });
         }
       } catch (e2) {
@@ -344,10 +364,30 @@ async function handleSellerAddressModal(client, interaction) {
         const freshFlow = await getFlow(uid);
         const { buyerId } = resolveLockedRoles(freshFlow, uid);
         const usdDisplay = priceUsdStr;
-        const ethDisplay = pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
+        const baseEthStr = pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
+        const baseEthNum = parseFloat(String(baseEthStr));
+        const buyerFeeEthNum = Number.isFinite(baseEthNum)
+          ? baseEthNum * 0.025
+          : null;
+        const buyerTotalEthNum = Number.isFinite(baseEthNum)
+          ? baseEthNum * 1.025
+          : null;
+        const fmt = (n, d = 6) =>
+          n != null && Number.isFinite(n)
+            ? Number(n)
+                .toFixed(d)
+                .replace(/(\.\d*?[1-9])0+$/u, "$1")
+                .replace(/\.0+$/u, ".0")
+                .replace(/\.$/u, "")
+            : "0";
         if (result?.escrowAddress && buyerId) {
           await interaction.channel.send({
-            content: `💸 <@${buyerId}> Please fund the escrow by sending ${ethDisplay} ETH (~$${usdDisplay} USD) to \`${result.escrowAddress}\`.`,
+            content:
+              `💸 <@${buyerId}> Funding details:\n` +
+              `• Escrow amount (base): ${fmt(baseEthNum)} ETH (~$${usdDisplay})\n` +
+              `• Buyer fee (2.5%): ${fmt(buyerFeeEthNum)} ETH\n` +
+              `• Total to send: ${fmt(buyerTotalEthNum)} ETH\n` +
+              `Send to: \`${result.escrowAddress}\``,
           });
         }
       } catch (e2) {

@@ -16,7 +16,13 @@
  * - We lock buyer/seller Discord IDs at thread creation to keep permissions consistent.
  */
 
-import { MessageFlags, ChannelType } from "discord.js";
+import {
+  MessageFlags,
+  ChannelType,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from "discord.js";
 
 import { startFlow, setFlow, getFlow, clearFlow } from "../utils/flowRepo.js";
 import {
@@ -36,6 +42,7 @@ import {
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { publicClient } from "../utils/client.js";
+import { convertUsdToEth } from "../utils/fx.js";
 import { safeThreadPatchMessage } from "../utils/threads.js";
 import {
   getEscrowState,
@@ -215,6 +222,23 @@ async function handleCreateThread(client, interaction) {
   const agreeMsg = await thread.send({
     components: [buildAgreeRow()],
   });
+  // Surface a Pre‑fund quote button for the buyer to get exact totals
+  try {
+    await thread.send({
+      content:
+        "💡 If you are the buyer, click the button below to see an exact pre‑fund quote (base, 2.5% fee, total) and a payment link.",
+      components: [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId("prefund_quote")
+            .setLabel("Get pre‑fund quote")
+            .setStyle(ButtonStyle.Secondary),
+        ),
+      ],
+    });
+  } catch (err) {
+    console.warn("prefund quote prompt failed:", err);
+  }
 
   await setFlow(uid, { threadId: thread.id, agreeMessageId: agreeMsg.id });
   await setFlow(flow.counterpartyId, {
@@ -432,6 +456,44 @@ async function handleMarkDelivered(interaction) {
       content: `🔔 <@${buyerId2}> Seller marked delivered. Please approve & release.`,
       allowedMentions: { users: [String(buyerId2)], parse: [] },
     });
+    // Post a countdown banner and release breakdown
+    try {
+      const amt = Number.parseFloat(String(updated?.amountEth ?? "0"));
+      const payoutEth = Number.isFinite(amt) && amt > 0 ? amt * 0.975 : null;
+      const payoutStr =
+        payoutEth != null
+          ? Number(payoutEth)
+              .toFixed(6)
+              .replace(/(\.\d*?[1-9])0+$/u, "$1")
+              .replace(/\.0+$/u, ".0")
+              .replace(/\.$/u, "")
+          : null;
+
+      // Chain-aware deadline from on-chain deliveryTimestamp + releaseTimeout (fallback to 24h from now)
+      const deliveredAt = Number(updated?.deliveredAtSec ?? 0);
+      const timeoutSec = Number(updated?.releaseTimeoutSec ?? 0);
+      const deadline =
+        deliveredAt > 0 && timeoutSec > 0
+          ? deliveredAt + timeoutSec
+          : Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+
+      // Etherscan link to the escrow contract (fallback to plain address)
+      const linkLine = updated?.addressUrl
+        ? `🔗 Escrow: ${updated.addressUrl}`
+        : `🔗 Escrow: \`${escrowAddress}\``;
+
+      const lines = [
+        `⏳ Auto‑release available at: <t:${deadline}:F> (that is <t:${deadline}:R>).`,
+        payoutStr
+          ? `📤 Estimated seller payout at release: ~ ${payoutStr} ETH after 2.5% seller fee.`
+          : `📤 Estimated seller payout: base × 97.5% after fee.`,
+        linkLine,
+        `ℹ️ Buyer can approve earlier with the green button. After the timeout, the bot can execute auto‑release.`,
+      ];
+      await interaction.channel.send({ content: lines.join("\n") });
+    } catch (e) {
+      console.warn("Countdown banner failed:", e);
+    }
 
     await interaction.editReply({
       content: `✅ Marked delivered.`,
@@ -498,6 +560,31 @@ async function handleApproveRelease(interaction) {
         flags: MessageFlags.Ephemeral,
       });
       return;
+    }
+    // Show release breakdown to the buyer before submitting the transaction
+    try {
+      const amt = Number.parseFloat(String(state?.amountEth ?? "0"));
+      const fee = Number.isFinite(amt) ? amt * 0.025 : null;
+      const payout = Number.isFinite(amt) ? amt * 0.975 : null;
+      const fmt = (n, d = 6) =>
+        Number(n)
+          .toFixed(d)
+          .replace(/(\.\d*?[1-9])0+$/u, "$1")
+          .replace(/\.0+$/u, ".0")
+          .replace(/\.$/u, "");
+      const parts = [
+        `Release breakdown:`,
+        `• Base (escrowed): ${Number.isFinite(amt) ? fmt(amt) : "—"} ETH`,
+        `• Seller fee (2.5%): ${fee != null ? fmt(fee) : "—"} ETH`,
+        `• Seller receives: ${payout != null ? fmt(payout) : "—"} ETH`,
+        `Submitting approval...`,
+      ];
+      await interaction.editReply({
+        content: parts.join("\n"),
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (err) {
+      console.warn("Release breakdown preflight failed:", err);
     }
     const res = await withLockThenCooldown(rateKey, 10000, 5000, async () => {
       const tx = await approveEscrowDelivery(escrowAddress);
@@ -570,6 +657,87 @@ async function handleApproveRelease(interaction) {
 /**
  * Cancel the pre-thread confirmation prompt and clear all flow state for both users.
  */
+/**
+ * Buyer-only: show a pre‑fund quote with base amount, 2.5% fee, total, and a payment link.
+ */
+async function handlePreFundQuote(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const uid = interaction.user.id;
+  const flow = await getFlow(uid);
+  if (!flow) {
+    await interaction.editReply({
+      content: "⚠️ No active trade flow found.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  const check = assertBuyer(uid, flow);
+  if (!check.ok) {
+    await interaction.editReply({
+      content: check.message,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  const escrowAddress = flow?.escrowAddress;
+  if (!escrowAddress) {
+    await interaction.editReply({
+      content:
+        "ℹ️ Escrow isn’t created yet. The quote will be available after the escrow address is posted.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Prefer pinned ETH at creation; fallback to live FX from USD if available
+  let baseEthStr = flow?.priceEthAtCreation ?? null;
+  if (!baseEthStr && flow?.priceUsd) {
+    try {
+      baseEthStr = (await convertUsdToEth(flow.priceUsd)).eth;
+    } catch {
+      // ignore
+    }
+  }
+  const baseEth = Number.parseFloat(String(baseEthStr ?? "0"));
+  if (!Number.isFinite(baseEth) || baseEth <= 0) {
+    await interaction.editReply({
+      content:
+        "Couldn’t compute the base amount yet. Ensure a USD price was set when creating the trade.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const buyerFee = baseEth * 0.025;
+  const totalEth = baseEth * 1.025;
+  const fmt = (n, d = 6) =>
+    Number(n)
+      .toFixed(d)
+      .replace(/(\.\d*?[1-9])0+$/u, "$1")
+      .replace(/\.0+$/u, ".0")
+      .replace(/\.$/u, "");
+  const toWei = (eth) => {
+    const s = String(eth);
+    const [i, f = ""] = s.split(".");
+    const frac = (f + "0".repeat(18)).slice(0, 18);
+    return BigInt(i) * 10n ** 18n + BigInt(frac);
+  };
+
+  const eip681 = `ethereum:${escrowAddress}?value=${toWei(totalEth)}`;
+  const lines = [
+    `Pre‑fund quote (buyer):`,
+    `• Escrow amount (base): ${fmt(baseEth)} ETH`,
+    `• Buyer fee (2.5%): ${fmt(buyerFee)} ETH`,
+    `• Total to send: ${fmt(totalEth)} ETH`,
+    `• Escrow address: \`${escrowAddress}\``,
+    `• Payment link: ${eip681}`,
+    `Network: Sepolia`,
+  ];
+  await interaction.editReply({
+    content: lines.join("\n"),
+    flags: MessageFlags.Ephemeral,
+  });
+}
 async function handleCancelCreateThread(client, interaction) {
   const uid = interaction.user.id;
   const flow = await getFlow(uid);
@@ -662,6 +830,8 @@ export async function handleButton(client, interaction) {
         return handleMarkDelivered(interaction);
       case "approve_release":
         return handleApproveRelease(interaction);
+      case "prefund_quote":
+        return handlePreFundQuote(interaction);
       case "verify_assign_role":
         return handleVerifyAssignRole(interaction);
       default:

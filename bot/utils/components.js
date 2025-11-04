@@ -10,6 +10,12 @@ import {
 } from "discord.js";
 
 import { COLORS, escrowEmbedColorForStatus, ASSETS } from "./theme.js";
+import {
+  formatEth,
+  formatUsd,
+  toNumberLoose,
+  buildEtherscanAddressUrl,
+} from "./format.js";
 
 export function buildTradeButton() {
   return new ActionRowBuilder().addComponents(
@@ -88,6 +94,15 @@ export function buildConfirmationEmbed({
   description,
   priceUsd,
 }) {
+  const baseUsd = toNumberLoose(priceUsd);
+  const buyerTotalUsd = Number.isFinite(baseUsd) ? baseUsd * 1.025 : null;
+  const sellerPayoutUsd = Number.isFinite(baseUsd) ? baseUsd * 0.975 : null;
+
+  const feesText =
+    buyerTotalUsd != null && sellerPayoutUsd != null
+      ? `Buyer pays: $${formatUsd(buyerTotalUsd)} (includes 2.5% fee)\nSeller receives on release: $${formatUsd(sellerPayoutUsd)} (after 2.5% fee)`
+      : "Buyer fee: 2.5% on top • Seller fee: 2.5% on payout";
+
   return new EmbedBuilder()
     .setTitle("✅ Let's Double-Check!")
     .setDescription(
@@ -103,6 +118,11 @@ export function buildConfirmationEmbed({
         inline: true,
       },
     )
+    .addFields({
+      name: "\nFees",
+      value: feesText,
+      inline: false,
+    })
     .setColor(COLORS.VERIFIED_GREEN);
 }
 
@@ -112,6 +132,15 @@ export function buildCreatedEmbed({
   description,
   priceUsd,
 }) {
+  const baseUsd = toNumberLoose(priceUsd);
+  const buyerTotalUsd = Number.isFinite(baseUsd) ? baseUsd * 1.025 : null;
+  const sellerPayoutUsd = Number.isFinite(baseUsd) ? baseUsd * 0.975 : null;
+
+  const feesText =
+    buyerTotalUsd != null && sellerPayoutUsd != null
+      ? `Buyer pays: $${formatUsd(buyerTotalUsd)} (includes 2.5% fee)\nSeller receives on release: $${formatUsd(sellerPayoutUsd)} (after 2.5% fee)`
+      : "Buyer fee: 2.5% on top • Seller fee: 2.5% on payout";
+
   return new EmbedBuilder()
     .setTitle("📄 Trade Summary")
     .setDescription(
@@ -123,6 +152,11 @@ export function buildCreatedEmbed({
       { name: "\nItem", value: description, inline: false },
       { name: "\nPrice (USD)", value: `$${priceUsd}`, inline: true },
     )
+    .addFields({
+      name: "\nFees",
+      value: feesText,
+      inline: false,
+    })
     .setFooter({ text: "Final check." })
     .setColor(COLORS.VERIFIED_GREEN);
 }
@@ -241,6 +275,37 @@ export function buildEscrowStatusEmbed({
   else if (s === "funded") nextAction = "seller to deliver";
   else if (s === "delivered") nextAction = "buyer to approve & release";
 
+  // Compute fee breakdowns (base amount = escrowed amount = amountEth)
+  const baseEthNum = toNumberLoose(amountEth);
+  const haveBase = Number.isFinite(baseEthNum) && baseEthNum > 0;
+
+  const sellerPayoutEthNum = haveBase ? baseEthNum * 0.975 : null;
+
+  const baseUsd = toNumberLoose(priceUsd);
+  const buyerTotalUsdNum = Number.isFinite(baseUsd) ? baseUsd * 1.025 : null;
+  const sellerPayoutUsdNum = Number.isFinite(baseUsd) ? baseUsd * 0.975 : null;
+
+  const feesLines = [];
+  if (haveBase) {
+    feesLines.push(
+      `Buyer pays: ${formatEth(baseEthNum * 1.025)} ETH (2.5% fee)`,
+    );
+    feesLines.push(
+      `Seller receives: ${formatEth(sellerPayoutEthNum)} ETH (after 2.5% fee)`,
+    );
+  }
+  if (buyerTotalUsdNum != null && sellerPayoutUsdNum != null) {
+    feesLines.push(
+      `Buyer pays: $${formatUsd(buyerTotalUsdNum)} • Seller receives: $${formatUsd(
+        sellerPayoutUsdNum,
+      )}`,
+    );
+  }
+  const feesValue =
+    feesLines.length > 0
+      ? feesLines.join("\n")
+      : "Buyer fee: 2.5% on top • Seller fee: 2.5% on payout";
+
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(description ?? "Current escrow status and details.")
@@ -258,7 +323,9 @@ export function buildEscrowStatusEmbed({
       },
       {
         name: "\nEscrow",
-        value: escrowAddress ? `\`${escrowAddress}\`` : "—",
+        value: escrowAddress
+          ? `[${escrowAddress}](${buildEtherscanAddressUrl(escrowAddress)})`
+          : "—",
         inline: false,
       },
       {
@@ -270,6 +337,11 @@ export function buildEscrowStatusEmbed({
         name: "\nSeller",
         value: sellerId ? `<@${sellerId}>` : "—",
         inline: true,
+      },
+      {
+        name: "\nFees & Totals",
+        value: feesValue,
+        inline: false,
       },
     )
     .setColor(escrowEmbedColorForStatus(statusText));
