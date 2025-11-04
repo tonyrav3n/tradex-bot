@@ -193,9 +193,6 @@ async function handleBuyerAddressModal(client, interaction) {
         buyerAddress: f.buyerAddress,
         sellerAddress: f.sellerAddress,
         amountEth: pinnedEth ?? undefined,
-        initOptions: {
-          initialDescription: `Price (USD): $${priceUsdStr}`,
-        },
       });
 
       try {
@@ -328,9 +325,6 @@ async function handleSellerAddressModal(client, interaction) {
         buyerAddress: f.buyerAddress,
         sellerAddress: f.sellerAddress,
         amountEth: pinnedEth ?? undefined,
-        initOptions: {
-          initialDescription: `Price (USD): $${priceUsdStr}`,
-        },
       });
 
       try {

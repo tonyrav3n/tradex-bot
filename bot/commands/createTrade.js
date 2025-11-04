@@ -6,6 +6,7 @@ import { isAdmin } from "../utils/roles.js";
 export const data = new SlashCommandBuilder()
   .setName("create_trade")
   .setDescription("Send 'Create Trade' embed")
+  .setDMPermission(false)
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {

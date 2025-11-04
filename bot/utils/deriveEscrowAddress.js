@@ -69,7 +69,11 @@ function tryDecodeEscrowCreated(log, abi) {
 
     for (const key of candidateKeys) {
       const val = args[key];
-      if (typeof val === "string" && val.startsWith("0x") && val.length === 42) {
+      if (
+        typeof val === "string" &&
+        val.startsWith("0x") &&
+        val.length === 42
+      ) {
         return val;
       }
     }
@@ -102,7 +106,11 @@ async function getLastEscrowFromFactory(factoryAddress, factoryAbi) {
       functionName: "getEscrow",
       args: [lastIdx],
     });
-    if (typeof escrow === "string" && escrow.startsWith("0x") && escrow.length === 42) {
+    if (
+      typeof escrow === "string" &&
+      escrow.startsWith("0x") &&
+      escrow.length === 42
+    ) {
       return escrow;
     }
     return null;
@@ -191,7 +199,8 @@ export async function deriveEscrowAddress({
 }
 
 /**
- * Convenience: derive escrow address directly from a tx hash.
+ * Convenience: derive escrow address directly from a
+ .
  * @param {string} txHash
  * @param {Object} [opts]
  * @returns {Promise<string>}

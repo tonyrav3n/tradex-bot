@@ -25,10 +25,9 @@ export function buildTradeEmbed() {
     .setColor(COLORS.VERIFIED_GREEN)
     .setTitle("🛡️ Start a Secure Trade")
     .setDescription(
-      "Ready to go? I'm here to help! \nClick below and I'll walk you through creating a secure, fair trade for you and your partner.",
+      "Ready to go? I'm here to help! Click below and I'll walk you through creating a secure, fair trade for you and your partner.",
     )
     .setThumbnail(ASSETS.LOGO_URL)
-    .setImage(ASSETS.BANNER_URL)
     .setFooter({
       text: "amis.",
       iconURL: ASSETS.LOGO_URL,
@@ -156,7 +155,6 @@ export function buildVerifyEmbed() {
     .setTitle("👋 Welcome to amis.!")
     .setDescription("Click on the button below to gain access.")
     .setThumbnail(ASSETS.LOGO_URL)
-    .setImage(ASSETS.BANNER_URL)
     .setFooter({ text: "amis.", iconURL: ASSETS.LOGO_URL });
 }
 

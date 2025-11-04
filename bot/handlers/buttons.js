@@ -213,7 +213,6 @@ async function handleCreateThread(client, interaction) {
     embeds: [embed],
   });
   const agreeMsg = await thread.send({
-    content: "✅ Please both click Agree to proceed.",
     components: [buildAgreeRow()],
   });
 
@@ -402,7 +401,7 @@ async function handleMarkDelivered(interaction) {
       }
       return;
     }
-    const txHash = res.value;
+
     try {
       await dbMarkDelivered(escrowAddress);
     } catch (e) {
@@ -423,6 +422,7 @@ async function handleMarkDelivered(interaction) {
       statusText: updated.statusText,
       amountEth: updated.amountEth,
       color: updated.color,
+      priceUsd: flow?.priceUsd,
       description: "Seller marked as Delivered.",
     });
     await updateEscrowStatusMessage(interaction, uid, embed2, updated);
@@ -434,7 +434,7 @@ async function handleMarkDelivered(interaction) {
     });
 
     await interaction.editReply({
-      content: `✅ Marked delivered. Tx: ${txHash}`,
+      content: `✅ Marked delivered.`,
       flags: MessageFlags.Ephemeral,
     });
   } catch (e) {
@@ -518,7 +518,7 @@ async function handleApproveRelease(interaction) {
       }
       return;
     }
-    const txHash = res.value;
+
     try {
       await dbMarkCompleted(escrowAddress);
     } catch (e) {
@@ -539,6 +539,7 @@ async function handleApproveRelease(interaction) {
       statusText: updated.statusText,
       amountEth: updated.amountEth,
       color: updated.color,
+      priceUsd: flow?.priceUsd,
       description: "Buyer approved delivery. Funds released.",
     });
     await updateEscrowStatusMessage(interaction, uid, embed2, updated);
@@ -550,7 +551,7 @@ async function handleApproveRelease(interaction) {
     });
 
     await interaction.editReply({
-      content: `✅ Approved and released. Tx: ${txHash}`,
+      content: `✅ Approved and released.`,
       flags: MessageFlags.Ephemeral,
     });
   } catch (e) {

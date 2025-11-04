@@ -146,7 +146,7 @@ export async function createAndAnnounceTrade({
 
     // 5) Edit the progress message to success + details
     await creatingMsg.edit({
-      content: `✅ Trade created!\n\n🔗 Tx Hash:\n${txHash}\n\n💰 Escrow Contract Address\n${escrowAddress}`,
+      content: `✅ Trade created!`,
     });
 
     // 6) Initialize the status embed + watcher
