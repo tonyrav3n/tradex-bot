@@ -7,16 +7,6 @@ dotenv.config();
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 /**
- * Determine whether EOA enforcement is enabled via environment.
- * ADDRESS_ENFORCE_EOA=true to require EOAs (non-contract addresses).
- */
-function envEnforceEoa() {
-  return String(process.env.ADDRESS_ENFORCE_EOA || "")
-    .trim()
-    .toLowerCase() === "true";
-}
-
-/**
  * Return a friendly error message for invalid address input.
  */
 function invalidFormatError() {
@@ -78,7 +68,7 @@ export async function checkEoa(checksumAddress) {
  */
 export async function normalizeAndValidateAddress(input, options = {}) {
   const enforceEoa =
-    options.enforceEoa !== undefined ? options.enforceEoa : envEnforceEoa();
+    options.enforceEoa !== undefined ? options.enforceEoa : true;
 
   if (typeof input !== "string") {
     return { ok: false, error: invalidFormatError() };
@@ -127,4 +117,63 @@ export async function requireValidAddress(input, options = {}) {
     throw new Error(res.error || invalidFormatError());
   }
   return res.address;
+}
+
+/**
+ * Normalize a USD amount input.
+ *
+ * Accepts formats like:
+ * - "$10", "$10.5", "10", "10.5", "1,234.56"
+ * - With or without whitespace
+ *
+ * Returns a normalized string with two decimals for safe DB insertion into NUMERIC(18,2).
+ *
+ * @param {string|number} input
+ * @returns {{ ok: true, value: string, number: number } | { ok: false, error: string }}
+ */
+export function normalizeUsdAmount(input) {
+  if (input === undefined || input === null) {
+    return { ok: false, error: "Enter a USD amount." };
+  }
+
+  let raw = String(input).trim();
+
+  // Remove spaces, optional leading '$', and thousands separators
+  raw = raw.replace(/\s+/g, "");
+  if (raw.startsWith("$")) raw = raw.slice(1);
+  raw = raw.replace(/,/g, "");
+
+  // Accept digits with optional decimal part; allow trailing dot (e.g., "10.")
+  if (!/^\d+(\.\d*)?$/.test(raw)) {
+    return {
+      ok: false,
+      error: "Enter a valid USD amount, e.g. 10, 10.5, $10, $10.50",
+    };
+  }
+
+  const num = Number(raw);
+  if (!Number.isFinite(num)) {
+    return { ok: false, error: "Enter a valid USD amount." };
+  }
+  if (num < 5) {
+    return { ok: false, error: "Minimum trade amount is $5.00" };
+  }
+
+  // Normalize to 2 decimals to match NUMERIC(18,2)
+  const value = num.toFixed(2);
+  return { ok: true, value, number: num };
+}
+
+/**
+ * Throwing variant of normalizeUsdAmount.
+ * @param {string|number} input
+ * @returns {string} normalized value with two decimals
+ * @throws Error with a user-friendly message
+ */
+export function requireUsdAmount(input) {
+  const res = normalizeUsdAmount(input);
+  if (!res.ok) {
+    throw new Error(res.error || "Enter a valid USD amount.");
+  }
+  return res.value;
 }

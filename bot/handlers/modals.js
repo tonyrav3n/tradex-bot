@@ -29,7 +29,10 @@ import {
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { createAndAnnounceTrade } from "../utils/tradeFlow.js";
 import { convertUsdToEth } from "../utils/fx.js";
-import { normalizeAndValidateAddress } from "../utils/validation.js";
+import {
+  normalizeAndValidateAddress,
+  requireUsdAmount,
+} from "../utils/validation.js";
 import {
   resolveLockedRoles,
   assertBuyer,
@@ -46,7 +49,17 @@ import {
 async function handleTradeDescriptionModal(client, interaction) {
   const uid = interaction.user.id;
   const description = interaction.fields.getTextInputValue("trade_description");
-  const priceUsd = interaction.fields.getTextInputValue("trade_price_usd");
+  const priceUsdInput = interaction.fields.getTextInputValue("trade_price_usd");
+  let normalizedPrice;
+  try {
+    normalizedPrice = requireUsdAmount(priceUsdInput);
+  } catch (err) {
+    await interaction.reply({
+      content: `❌ ${err.message || "Enter a valid USD amount (minimum $5)."}`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   // Store description for both sides
   const existingFlow = await getFlow(uid);
@@ -57,12 +70,12 @@ async function handleTradeDescriptionModal(client, interaction) {
     description,
     originalInteractionToken: originalToken,
   });
-  await setPrice(uid, priceUsd);
+  await setPrice(uid, normalizedPrice);
 
   const flow = await getFlow(uid);
   if (flow?.counterpartyId) {
     await setFlow(flow.counterpartyId, { description });
-    await setPrice(flow.counterpartyId, priceUsd);
+    await setPrice(flow.counterpartyId, normalizedPrice);
   }
 
   const { buyerId, sellerId } = resolveLockedRoles(flow, uid);
@@ -71,7 +84,7 @@ async function handleTradeDescriptionModal(client, interaction) {
     buyerId,
     sellerId,
     description,
-    priceUsd,
+    priceUsd: normalizedPrice,
   });
   const row = buildCreateThreadRow();
 
