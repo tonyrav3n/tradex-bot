@@ -26,10 +26,10 @@
    Constants
    =========================== */
 
-export const BPS_SCALE_BI = 10_000n;     // basis points scale for BigInt math
-export const FEE_BPS_BI = 250n;          // 2.5% fee in basis points (per side)
-export const TOTAL_FEE_BPS_BI = 500n;    // 5.0% total (buyer + seller)
-export const BOT_SHARE_BPS_BI = 100n;    // bot gets 100/500 = 20% of each side's fee (i.e., 0.5% of base)
+export const BPS_SCALE_BI = 10_000n; // basis points scale for BigInt math
+export const FEE_BPS_BI = 250n; // 2.5% fee in basis points (per side)
+export const TOTAL_FEE_BPS_BI = 500n; // 5.0% total (buyer + seller)
+export const BOT_SHARE_BPS_BI = 100n; // bot gets 100/500 = 20% of each side's fee (i.e., 0.5% of base)
 
 export const DEFAULT_RELEASE_TIMEOUT_SECONDS = 24 * 60 * 60; // 1 day
 
@@ -301,7 +301,9 @@ export function isReleaseReady(
   deliveredAtSec,
   releaseTimeoutSec = DEFAULT_RELEASE_TIMEOUT_SECONDS,
 ) {
-  return releaseTimeLeftSeconds(nowSec, deliveredAtSec, releaseTimeoutSec) === 0;
+  return (
+    releaseTimeLeftSeconds(nowSec, deliveredAtSec, releaseTimeoutSec) === 0
+  );
 }
 
 /* ===========================

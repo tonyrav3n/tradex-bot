@@ -239,7 +239,6 @@ async function handleCreateThread(client, interaction) {
   } catch (err) {
     console.warn("prefund quote prompt failed:", err);
   }
-
   await setFlow(uid, { threadId: thread.id, agreeMessageId: agreeMsg.id });
   await setFlow(flow.counterpartyId, {
     threadId: thread.id,
@@ -357,11 +356,14 @@ async function handleAgreeSeller(interaction) {
  * Seller marks delivered (contract write via bot).
  */
 async function handleMarkDelivered(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.reply({
+    content: "⏳ Processing...",
+    flags: MessageFlags.Ephemeral,
+  });
   const uid = interaction.user.id;
   const flow = await getFlow(uid);
   if (!flow) {
-    await interaction.reply({
+    await interaction.editReply({
       content: "⚠️ No active trade flow found.",
       flags: MessageFlags.Ephemeral,
     });
@@ -458,16 +460,7 @@ async function handleMarkDelivered(interaction) {
     });
     // Post a countdown banner and release breakdown
     try {
-      const amt = Number.parseFloat(String(updated?.amountEth ?? "0"));
-      const payoutEth = Number.isFinite(amt) && amt > 0 ? amt * 0.975 : null;
-      const payoutStr =
-        payoutEth != null
-          ? Number(payoutEth)
-              .toFixed(6)
-              .replace(/(\.\d*?[1-9])0+$/u, "$1")
-              .replace(/\.0+$/u, ".0")
-              .replace(/\.$/u, "")
-          : null;
+      // removed unused payout calculations
 
       // Chain-aware deadline from on-chain deliveryTimestamp + releaseTimeout (fallback to 24h from now)
       const deliveredAt = Number(updated?.deliveredAtSec ?? 0);
@@ -477,18 +470,10 @@ async function handleMarkDelivered(interaction) {
           ? deliveredAt + timeoutSec
           : Math.floor(Date.now() / 1000) + 24 * 60 * 60;
 
-      // Etherscan link to the escrow contract (fallback to plain address)
-      const linkLine = updated?.addressUrl
-        ? `🔗 Escrow: ${updated.addressUrl}`
-        : `🔗 Escrow: \`${escrowAddress}\``;
+      // removed escrow link line
 
       const lines = [
         `⏳ Auto‑release available at: <t:${deadline}:F> (that is <t:${deadline}:R>).`,
-        payoutStr
-          ? `📤 Estimated seller payout at release: ~ ${payoutStr} ETH after 2.5% seller fee.`
-          : `📤 Estimated seller payout: base × 97.5% after fee.`,
-        linkLine,
-        `ℹ️ Buyer can approve earlier with the green button. After the timeout, the bot can execute auto‑release.`,
       ];
       await interaction.channel.send({ content: lines.join("\n") });
     } catch (e) {
@@ -511,7 +496,10 @@ async function handleMarkDelivered(interaction) {
  * Buyer approves delivery and releases funds (contract write via bot).
  */
 async function handleApproveRelease(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.reply({
+    content: "⏳ Processing...",
+    flags: MessageFlags.Ephemeral,
+  });
   const uid = interaction.user.id;
   const flow = await getFlow(uid);
   if (!flow) {

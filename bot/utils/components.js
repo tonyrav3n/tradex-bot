@@ -288,7 +288,7 @@ export function buildEscrowStatusEmbed({
   const feesLines = [];
   if (haveBase) {
     feesLines.push(
-      `Buyer pays: ${formatEth(baseEthNum * 1.025)} ETH (2.5% fee)`,
+      `Buyer pays: ${formatEth(baseEthNum * 1.025)} ETH (includes 2.5% fee)`,
     );
     feesLines.push(
       `Seller receives: ${formatEth(sellerPayoutEthNum)} ETH (after 2.5% fee)`,
