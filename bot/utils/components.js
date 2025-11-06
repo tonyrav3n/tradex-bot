@@ -390,18 +390,31 @@ export function buildApproveReleaseRow() {
   );
 }
 
+export function buildPreFundQuoteRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("prefund_quote")
+      .setLabel("Get pre‑fund quote")
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
 /**
  * Helper to choose status-specific action buttons.
  * Accepts either numeric status (enum) or status text.
  *
- * - Created/Completed/Cancelled/Disputed: no actions
+ * - Created: Get pre‑fund quote
  * - Funded: Mark Delivered
  * - Delivered: Approve & Release
+ * - Completed/Cancelled/Disputed: no actions
  */
 export function buildActionsForStatus(status) {
   const s = typeof status === "string" ? status.toLowerCase() : Number(status);
 
-  // Created, Completed, Cancelled, Disputed -> no actions
+  if (s === 0 || s === "created") {
+    // Created -> Secondary "Get pre‑fund quote"
+    return [buildPreFundQuoteRow()];
+  }
   if (s === 1 || s === "funded") {
     // Funded -> Primary (blue) "Mark Delivered"
     return [buildMarkDeliveredRow()];

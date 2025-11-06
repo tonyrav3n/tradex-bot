@@ -1,6 +1,6 @@
 # TradeNest Discord Bot – Fees and UX
 
-This document explains the new 2.5% + 2.5% fee model, how the pre‑fund quote works (including the payment link), the release breakdown and countdown, and outlines the upcoming dispute feature.
+This document explains the new 2.5% + 2.5% fee model, how the pre‑fund quote works, the release breakdown and countdown, and outlines the upcoming dispute feature.
 
 ## Fee model overview
 
@@ -30,14 +30,14 @@ Quick math reference:
 Purpose: Give the buyer an exact, one‑tap breakdown before funding to eliminate surprises.
 
 How it appears:
-- In the private trade thread, the bot posts a button: “Get pre‑fund quote”.
+- In the Escrow Status message while status is Created (awaiting funding), click “Get pre‑fund quote”.
 - Only the buyer sees the response (ephemeral).
 
 What the quote shows:
 - Escrow amount (base): the amount that will be locked in the contract.
 - Buyer fee (2.5%): computed from base.
-- Total to send: base × 1.025 (in ETH) and the escrow address.
-- Payment link (EIP‑681): opens a wallet with prefilled recipient and amount on supporting clients.
+- Total to send: base × 1.025 (in ETH).
+- Escrow address: the escrow contract address to fund.
 - Network name (e.g., Sepolia).
 - If a USD price was provided at trade creation, the base ETH is pinned from that USD value to keep UX stable.
 
@@ -45,13 +45,7 @@ Behavior and accuracy:
 - The base ETH number is pinned at creation time from the user’s USD input (using a price feed). If pinning wasn’t possible, a live FX rate is used.
 - The contract itself enforces the fee math; the quote mirrors the on‑chain result.
 
-## Payment link (EIP‑681)
 
-Format used: `ethereum:<escrow_address>?value=<wei_total>`
-- `<escrow_address>` is the newly created escrow contract.
-- `value` is the total to send in wei (the buyer total, i.e., base × 1.025).
-- Optional chain id: some wallets accept `ethereum:<escrow_address>@<chainId>?value=<wei_total>`, but broadest compatibility is usually without `@<chainId>`.
-- Wallet compatibility varies. Many mobile wallets (e.g., MetaMask mobile, Trust Wallet, Rainbow) respect EIP‑681 deep links. Desktop browser extensions may ignore the link; that’s why the bot also shows the address and amount clearly for manual copy/paste.
 
 ## Release breakdown
 
@@ -67,7 +61,7 @@ After the transaction, the thread is updated to reflect completion and fee payme
 Flow:
 1. Seller clicks “Mark Delivered.” The contract moves to Delivered, and the bot posts:
    - A countdown banner showing when auto‑release becomes available, using Discord timestamps: both the absolute time and relative time.
-   - An estimated seller payout (≈ base × 97.5%).
+
 2. Buyer can approve earlier via “Approve & Release.”
 3. If the buyer does not act, the contract allows release after a timeout (currently 24 hours by default in the contract).
 4. After the timeout, the bot (as the authorized actor) can execute auto‑release on-chain.

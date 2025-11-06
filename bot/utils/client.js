@@ -41,12 +41,20 @@ export const resolvedChain = availableChains.find(
 export const walletClient = createWalletClient({
   account,
   chain: resolvedChain,
-  transport: http(NETWORK_RPC_URL),
+  transport: http(NETWORK_RPC_URL, {
+    timeout: 30000,
+    retryCount: 10,
+    retryDelay: 1000,
+  }),
 });
 
 export const publicClient = createPublicClient({
   chain: resolvedChain,
-  transport: http(NETWORK_RPC_URL),
+  transport: http(NETWORK_RPC_URL, {
+    timeout: 30000,
+    retryCount: 10,
+    retryDelay: 1000,
+  }),
 });
 
 export function getExplorerBaseUrl() {

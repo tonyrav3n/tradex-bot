@@ -16,13 +16,7 @@
  * - We lock buyer/seller Discord IDs at thread creation to keep permissions consistent.
  */
 
-import {
-  MessageFlags,
-  ChannelType,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-} from "discord.js";
+import { MessageFlags, ChannelType } from "discord.js";
 
 import { startFlow, setFlow, getFlow, clearFlow } from "../utils/flowRepo.js";
 import {
@@ -222,23 +216,7 @@ async function handleCreateThread(client, interaction) {
   const agreeMsg = await thread.send({
     components: [buildAgreeRow()],
   });
-  // Surface a Pre‑fund quote button for the buyer to get exact totals
-  try {
-    await thread.send({
-      content:
-        "💡 If you are the buyer, click the button below to see an exact pre‑fund quote (base, 2.5% fee, total) and a payment link.",
-      components: [
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId("prefund_quote")
-            .setLabel("Get pre‑fund quote")
-            .setStyle(ButtonStyle.Secondary),
-        ),
-      ],
-    });
-  } catch (err) {
-    console.warn("prefund quote prompt failed:", err);
-  }
+
   await setFlow(uid, { threadId: thread.id, agreeMessageId: agreeMsg.id });
   await setFlow(flow.counterpartyId, {
     threadId: thread.id,
@@ -265,91 +243,78 @@ async function handleCreateThread(client, interaction) {
  * Show the buyer address modal (buyer only).
  */
 async function handleAgreeBuyer(interaction) {
-  const uid = interaction.user.id;
-  const flow = await getFlow(uid);
-  if (!flow) {
-    await interaction.editReply({
-      content: "⚠️ No active trade flow found.",
-      flags: MessageFlags.Ephemeral,
-      components: [],
-    });
-    return;
-  }
-  const check = assertBuyer(uid, flow);
-  if (!check.ok) {
-    await interaction.reply({
-      content: check.message,
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-  // Guard against stale flow: ensure this agree action is for the current thread
-  const currentThreadId = interaction.channel?.id;
-  if (currentThreadId && flow.threadId && flow.threadId !== currentThreadId) {
-    await setFlow(uid, {
-      buyerAgreed: false,
-      buyerAddress: null,
-      threadId: currentThreadId,
-    });
-  }
+  try {
+    await interaction.showModal(buildBuyerAddressModal());
+  } catch (e) {
+    console.error("handleAgreeBuyer: showModal failed:", e);
+    const msg = (e && (e.rawError?.message || e.message)) || "";
+    const isUnknown =
+      String(msg).toLowerCase().includes("unknown interaction") ||
+      (e && Number(e.code) === 10062);
 
-  const fresh = (await getFlow(uid)) || flow;
-
-  // Only block as 'already agreed' if we have a positive agreement with an address
-  if (fresh.buyerAgreed && fresh.buyerAddress) {
-    await interaction.reply({
-      content: "ℹ️ You already agreed.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
+    // Try to guide the user to retry
+    try {
+      await interaction.reply({
+        content: isUnknown
+          ? "This interaction expired. Please click the button again to open the form."
+          : "Couldn’t open the form. Please try again.",
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch {
+      // Last resort: post a visible notice in the thread to guide the user
+      try {
+        await interaction.channel.send({
+          content: `⚠️ <@${interaction.user.id}> ${
+            isUnknown
+              ? "That interaction expired. Please press the button again to open the form."
+              : "Couldn’t open the form. Please try again."
+          }`,
+          allowedMentions: { users: [String(interaction.user.id)], parse: [] },
+        });
+      } catch {
+        // swallow
+      }
+    }
   }
-  await interaction.showModal(buildBuyerAddressModal());
 }
 
 /**
  * Show the seller address modal (seller only).
  */
 async function handleAgreeSeller(interaction) {
-  const uid = interaction.user.id;
-  const flow = await getFlow(uid);
-  if (!flow) {
-    await interaction.reply({
-      content: "⚠️ No active trade flow found.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-  const sellerId =
-    flow.sellerDiscordId ??
-    (flow.role === "seller" ? uid : flow.counterpartyId);
-  if (uid !== sellerId) {
-    await interaction.reply({
-      content: "⚠️ You are not the seller for this trade.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-  // Guard against stale flow: ensure this agree action is for the current thread
-  const currentThreadId = interaction.channel?.id;
-  if (currentThreadId && flow.threadId && flow.threadId !== currentThreadId) {
-    await setFlow(uid, {
-      sellerAgreed: false,
-      sellerAddress: null,
-      threadId: currentThreadId,
-    });
-  }
+  try {
+    await interaction.showModal(buildSellerAddressModal());
+  } catch (e) {
+    console.error("handleAgreeSeller: showModal failed:", e);
+    const msg = (e && (e.rawError?.message || e.message)) || "";
+    const isUnknown =
+      String(msg).toLowerCase().includes("unknown interaction") ||
+      (e && Number(e.code) === 10062);
 
-  const fresh = (await getFlow(uid)) || flow;
-
-  // Only block as 'already agreed' if we have a positive agreement with an address
-  if (fresh.sellerAgreed && fresh.sellerAddress) {
-    await interaction.reply({
-      content: "ℹ️ You already agreed.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
+    // Try to guide the user to retry
+    try {
+      await interaction.reply({
+        content: isUnknown
+          ? "This interaction expired. Please click the button again to open the form."
+          : "Couldn’t open the form. Please try again.",
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch {
+      // Last resort: post a visible notice in the thread to guide the user
+      try {
+        await interaction.channel.send({
+          content: `⚠️ <@${interaction.user.id}> ${
+            isUnknown
+              ? "That interaction expired. Please press the button again to open the form."
+              : "Couldn’t open the form. Please try again."
+          }`,
+          allowedMentions: { users: [String(interaction.user.id)], parse: [] },
+        });
+      } catch {
+        // swallow
+      }
+    }
   }
-  await interaction.showModal(buildSellerAddressModal());
 }
 
 /**
@@ -646,10 +611,13 @@ async function handleApproveRelease(interaction) {
  * Cancel the pre-thread confirmation prompt and clear all flow state for both users.
  */
 /**
- * Buyer-only: show a pre‑fund quote with base amount, 2.5% fee, total, and a payment link.
+ * Buyer-only: show a pre‑fund quote with base amount, 2.5% fee, and total. No payment link.
  */
 async function handlePreFundQuote(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.reply({
+    content: "⏳ Processing...",
+    flags: MessageFlags.Ephemeral,
+  });
   const uid = interaction.user.id;
   const flow = await getFlow(uid);
   if (!flow) {
@@ -671,10 +639,24 @@ async function handlePreFundQuote(interaction) {
   if (!escrowAddress) {
     await interaction.editReply({
       content:
-        "ℹ️ Escrow isn’t created yet. The quote will be available after the escrow address is posted.",
+        "ℹ️ Escrow isn’t created yet. The quote is only available after the escrow has been created (awaiting funding).",
       flags: MessageFlags.Ephemeral,
     });
     return;
+  }
+  // Allow the pre‑fund quote only while the escrow is in Created (awaiting funding)
+  try {
+    const state = await getEscrowState(escrowAddress);
+    if (Number(state?.status) !== 0) {
+      await interaction.editReply({
+        content:
+          "ℹ️ The pre‑fund quote is only available while the trade is awaiting funding.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+  } catch {
+    // If we cannot read state, proceed with caution (escrow exists)
   }
 
   // Prefer pinned ETH at creation; fallback to live FX from USD if available
@@ -704,21 +686,13 @@ async function handlePreFundQuote(interaction) {
       .replace(/(\.\d*?[1-9])0+$/u, "$1")
       .replace(/\.0+$/u, ".0")
       .replace(/\.$/u, "");
-  const toWei = (eth) => {
-    const s = String(eth);
-    const [i, f = ""] = s.split(".");
-    const frac = (f + "0".repeat(18)).slice(0, 18);
-    return BigInt(i) * 10n ** 18n + BigInt(frac);
-  };
 
-  const eip681 = `ethereum:${escrowAddress}?value=${toWei(totalEth)}`;
   const lines = [
     `Pre‑fund quote (buyer):`,
     `• Escrow amount (base): ${fmt(baseEth)} ETH`,
     `• Buyer fee (2.5%): ${fmt(buyerFee)} ETH`,
     `• Total to send: ${fmt(totalEth)} ETH`,
     `• Escrow address: \`${escrowAddress}\``,
-    `• Payment link: ${eip681}`,
     `Network: Sepolia`,
   ];
   await interaction.editReply({

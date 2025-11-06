@@ -16,10 +16,7 @@
  * - BigInt helpers operate in wei and mirror Solidity's floor division semantics.
  * - Number helpers operate in ETH (floating point) and are intended for UI display only.
  *
- * EIP-681 Payment Links:
- * - Basic format: `ethereum:<address>?value=<wei>`
- * - Optional chain id: `ethereum:<address>@<chainId>?value=<wei>`
- *   Not all wallets support @chainId; the simple form without @ is the most broadly supported.
+
  */
 
 /* ===========================
@@ -236,34 +233,6 @@ export function buildEthBreakdownFromBase(baseEth) {
 }
 
 /* ===========================
-   Payment link (EIP-681)
-   =========================== */
-
-/**
- * Build a simple EIP-681 payment link that most wallets understand.
- * - address: 0x-prefixed hex address
- * - valueWei: BigInt or string decimal of wei (optional, but recommended)
- * - chainId: optional (e.g., 11155111 for Sepolia) — not all wallets support @chainId
- *
- * Examples:
- * - ethereum:0xAbC...123?value=1000000000000000000
- * - ethereum:0xAbC...123@11155111?value=1000000000000000000
- */
-export function buildPaymentLink(address, { valueWei, chainId } = {}) {
-  if (!address || typeof address !== "string") {
-    throw new Error("buildPaymentLink: 'address' must be a string");
-  }
-  const addr = address.trim();
-  const chainPart =
-    chainId !== undefined && chainId !== null ? `@${String(chainId)}` : "";
-  const valuePart =
-    valueWei !== undefined && valueWei !== null
-      ? `?value=${String(valueWei)}`
-      : "";
-  return `ethereum:${addr}${chainPart}${valuePart}`;
-}
-
-/* ===========================
    Release countdown helpers
    =========================== */
 
@@ -340,9 +309,6 @@ export default {
   sellerPayoutEthFromBaseEth,
   splitFeeEth,
   buildEthBreakdownFromBase,
-
-  // Payment link
-  buildPaymentLink,
 
   // Countdown
   computeReleaseDeadline,
