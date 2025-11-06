@@ -81,8 +81,14 @@ function rowToEscrow(row) {
     sellerDiscordId: row.seller_discord_id ?? null,
     buyerAddress: row.buyer_address ?? null,
     sellerAddress: row.seller_address ?? null,
-    amountWei: row.amount_wei !== null && row.amount_wei !== undefined ? String(row.amount_wei) : null,
-    status: row.status !== null && row.status !== undefined ? Number(row.status) : null,
+    amountWei:
+      row.amount_wei !== null && row.amount_wei !== undefined
+        ? String(row.amount_wei)
+        : null,
+    status:
+      row.status !== null && row.status !== undefined
+        ? Number(row.status)
+        : null,
     statusText: row.status_text ?? null,
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
@@ -217,7 +223,8 @@ export async function recordEscrowCreation(params) {
  * @param {{ status?: number|bigint|null, amountWei?: string|number|bigint|null, statusText?: string|null }} patch
  */
 export async function setEscrowStatus(escrowAddress, patch = {}) {
-  if (!escrowAddress) throw new Error("setEscrowStatus: escrowAddress required");
+  if (!escrowAddress)
+    throw new Error("setEscrowStatus: escrowAddress required");
   const fields = [];
   const values = [];
   let idx = 1;
@@ -264,7 +271,8 @@ export async function setEscrowStatus(escrowAddress, patch = {}) {
  * @param {{ channelId?: string|null, threadId?: string|null, statusMessageId?: string|null }} ctx
  */
 export async function setEscrowDiscordContext(escrowAddress, ctx = {}) {
-  if (!escrowAddress) throw new Error("setEscrowDiscordContext: escrowAddress required");
+  if (!escrowAddress)
+    throw new Error("setEscrowDiscordContext: escrowAddress required");
   const fields = [];
   const values = [];
   let i = 1;
@@ -302,7 +310,8 @@ export async function setEscrowDiscordContext(escrowAddress, ctx = {}) {
  * @param {{ buyerDiscordId?: string|null, sellerDiscordId?: string|null, buyerAddress?: string|null, sellerAddress?: string|null }} patch
  */
 export async function setEscrowParties(escrowAddress, patch = {}) {
-  if (!escrowAddress) throw new Error("setEscrowParties: escrowAddress required");
+  if (!escrowAddress)
+    throw new Error("setEscrowParties: escrowAddress required");
   const fields = [];
   const values = [];
   let i = 1;
@@ -344,7 +353,8 @@ export async function setEscrowParties(escrowAddress, patch = {}) {
  * @param {bigint|string|number|null} amountWei
  */
 export async function setEscrowAmount(escrowAddress, amountWei) {
-  if (!escrowAddress) throw new Error("setEscrowAmount: escrowAddress required");
+  if (!escrowAddress)
+    throw new Error("setEscrowAmount: escrowAddress required");
   const sql = `
     UPDATE escrows
     SET amount_wei = $1
@@ -475,6 +485,328 @@ export async function markDisputed(escrowAddress, extra = {}) {
   });
 }
 
+/**
+ * Amis (manager + tradeId) helpers
+ */
+
+/**
+ * Upsert an escrow record keyed by (manager_address, trade_id).
+ * Requires a unique index on (manager_address, trade_id).
+ * @param {object} escrow
+ * @returns {Promise<object>}
+ */
+export async function upsertEscrowByManagerTrade(escrow) {
+  if (!escrow || !escrow.managerAddress || escrow.tradeId == null) {
+    throw new Error(
+      "upsertEscrowByManagerTrade: 'managerAddress' and 'tradeId' are required",
+    );
+  }
+
+  const columns = [
+    "manager_address",
+    "trade_id",
+    "factory_tx_hash",
+    "channel_id",
+    "thread_id",
+    "status_message_id",
+    "creator_user_id",
+    "buyer_discord_id",
+    "seller_discord_id",
+    "buyer_address",
+    "seller_address",
+    "amount_wei",
+    "status",
+    "status_text",
+  ];
+  const values = [
+    escrow.managerAddress,
+    String(escrow.tradeId),
+    escrow.factoryTxHash ?? null,
+    escrow.channelId ?? null,
+    escrow.threadId ?? null,
+    escrow.statusMessageId ?? null,
+    escrow.creatorUserId ?? null,
+    escrow.buyerDiscordId ?? null,
+    escrow.sellerDiscordId ?? null,
+    escrow.buyerAddress ?? null,
+    escrow.sellerAddress ?? null,
+    toDbAmount(escrow.amountWei),
+    escrow.status !== undefined && escrow.status !== null
+      ? Number(escrow.status)
+      : null,
+    escrow.statusText ?? null,
+  ];
+  const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
+  const updates = columns
+    .filter((c) => c !== "manager_address" && c !== "trade_id")
+    .map((c) => `${c}=EXCLUDED.${c}`)
+    .join(", ");
+
+  const sql = `
+    INSERT INTO escrows (${columns.join(", ")})
+    VALUES (${placeholders})
+    ON CONFLICT (manager_address, trade_id) DO UPDATE SET
+      ${updates}
+    RETURNING *
+  `;
+
+  const res = await query(sql, values);
+  return rowToEscrow(res.rows[0]);
+}
+
+/**
+ * Create a new Amis trade record right after createTrade.
+ * If it exists, merges provided fields.
+ *
+ * @param {object} params
+ * @param {string} params.managerAddress
+ * @param {string|number|bigint} params.tradeId
+ * @param {string} [params.channelId]
+ * @param {string} [params.threadId]
+ * @param {string} [params.statusMessageId]
+ * @param {string} [params.creatorUserId]
+ * @param {string} [params.buyerDiscordId]
+ * @param {string} [params.sellerDiscordId]
+ * @param {string} [params.buyerAddress]
+ * @param {string} [params.sellerAddress]
+ * @returns {Promise<object>}
+ */
+export async function recordAmisTradeCreation(params) {
+  const payload = {
+    managerAddress: params.managerAddress,
+    tradeId: params.tradeId != null ? String(params.tradeId) : null,
+    factoryTxHash: params.factoryTxHash ?? null,
+    channelId: params.channelId ?? null,
+    threadId: params.threadId ?? null,
+    statusMessageId: params.statusMessageId ?? null,
+    creatorUserId: params.creatorUserId ?? null,
+    buyerDiscordId: params.buyerDiscordId ?? null,
+    sellerDiscordId: params.sellerDiscordId ?? null,
+    buyerAddress: params.buyerAddress ?? null,
+    sellerAddress: params.sellerAddress ?? null,
+    amountWei: null,
+    status: ESCROW_STATUS.Created,
+    statusText: statusLabel(ESCROW_STATUS.Created),
+  };
+  return upsertEscrowByManagerTrade(payload);
+}
+
+/**
+ * Update status/amount/status_text for an Amis trade.
+ * @param {string} managerAddress
+ * @param {string|number|bigint} tradeId
+ * @param {{ status?: number|bigint|null, amountWei?: string|number|bigint|null, statusText?: string|null }} patch
+ */
+export async function setEscrowStatusByManagerTrade(
+  managerAddress,
+  tradeId,
+  patch = {},
+) {
+  if (!managerAddress)
+    throw new Error("setEscrowStatusByManagerTrade: managerAddress required");
+  if (tradeId === null || tradeId === undefined)
+    throw new Error("setEscrowStatusByManagerTrade: tradeId required");
+
+  const fields = [];
+  const values = [];
+  let idx = 1;
+
+  if (patch.status !== undefined) {
+    fields.push(`status = $${idx++}`);
+    values.push(patch.status !== null ? Number(patch.status) : null);
+  }
+  if (patch.amountWei !== undefined) {
+    fields.push(`amount_wei = $${idx++}`);
+    values.push(toDbAmount(patch.amountWei));
+  }
+  if (patch.statusText !== undefined) {
+    fields.push(`status_text = $${idx++}`);
+    values.push(patch.statusText);
+  }
+  if (
+    patch.status !== undefined &&
+    patch.status !== null &&
+    patch.statusText === undefined
+  ) {
+    fields.push(`status_text = $${idx++}`);
+    values.push(statusLabel(patch.status));
+  }
+
+  if (fields.length === 0)
+    return getEscrowByManagerTrade(managerAddress, tradeId);
+
+  const sql = `
+    UPDATE escrows
+    SET ${fields.join(", ")}
+    WHERE manager_address = $${idx} AND trade_id = $${idx + 1}
+    RETURNING *
+  `;
+  values.push(managerAddress, String(tradeId));
+
+  const res = await query(sql, values);
+  return rowToEscrow(res.rows[0]);
+}
+
+/**
+ * Update Discord context by (manager, tradeId).
+ * @param {string} managerAddress
+ * @param {string|number|bigint} tradeId
+ * @param {{ channelId?: string|null, threadId?: string|null, statusMessageId?: string|null }} ctx
+ */
+export async function setEscrowDiscordContextByManagerTrade(
+  managerAddress,
+  tradeId,
+  ctx = {},
+) {
+  if (!managerAddress)
+    throw new Error(
+      "setEscrowDiscordContextByManagerTrade: managerAddress required",
+    );
+  if (tradeId === null || tradeId === undefined)
+    throw new Error("setEscrowDiscordContextByManagerTrade: tradeId required");
+
+  const fields = [];
+  const values = [];
+  let i = 1;
+
+  if (ctx.channelId !== undefined) {
+    fields.push(`channel_id = $${i++}`);
+    values.push(ctx.channelId);
+  }
+  if (ctx.threadId !== undefined) {
+    fields.push(`thread_id = $${i++}`);
+    values.push(ctx.threadId);
+  }
+  if (ctx.statusMessageId !== undefined) {
+    fields.push(`status_message_id = $${i++}`);
+    values.push(ctx.statusMessageId);
+  }
+
+  if (fields.length === 0)
+    return getEscrowByManagerTrade(managerAddress, tradeId);
+
+  const sql = `
+    UPDATE escrows
+    SET ${fields.join(", ")}
+    WHERE manager_address = $${i} AND trade_id = $${i + 1}
+    RETURNING *
+  `;
+  values.push(managerAddress, String(tradeId));
+
+  const res = await query(sql, values);
+  return rowToEscrow(res.rows[0]);
+}
+
+/**
+ * Update parties by (manager, tradeId).
+ * @param {string} managerAddress
+ * @param {string|number|bigint} tradeId
+ * @param {{ buyerDiscordId?: string|null, sellerDiscordId?: string|null, buyerAddress?: string|null, sellerAddress?: string|null }} patch
+ */
+export async function setEscrowPartiesByManagerTrade(
+  managerAddress,
+  tradeId,
+  patch = {},
+) {
+  if (!managerAddress)
+    throw new Error("setEscrowPartiesByManagerTrade: managerAddress required");
+  if (tradeId === null || tradeId === undefined)
+    throw new Error("setEscrowPartiesByManagerTrade: tradeId required");
+  const fields = [];
+  const values = [];
+  let i = 1;
+
+  if (patch.buyerDiscordId !== undefined) {
+    fields.push(`buyer_discord_id = $${i++}`);
+    values.push(patch.buyerDiscordId);
+  }
+  if (patch.sellerDiscordId !== undefined) {
+    fields.push(`seller_discord_id = $${i++}`);
+    values.push(patch.sellerDiscordId);
+  }
+  if (patch.buyerAddress !== undefined) {
+    fields.push(`buyer_address = $${i++}`);
+    values.push(patch.buyerAddress);
+  }
+  if (patch.sellerAddress !== undefined) {
+    fields.push(`seller_address = $${i++}`);
+    values.push(patch.sellerAddress);
+  }
+
+  if (fields.length === 0)
+    return getEscrowByManagerTrade(managerAddress, tradeId);
+
+  const sql = `
+    UPDATE escrows
+    SET ${fields.join(", ")}
+    WHERE manager_address = $${i} AND trade_id = $${i + 1}
+    RETURNING *
+  `;
+  values.push(managerAddress, String(tradeId));
+
+  const res = await query(sql, values);
+  return rowToEscrow(res.rows[0]);
+}
+
+/**
+ * Set amount_wei by (manager, tradeId).
+ * @param {string} managerAddress
+ * @param {string|number|bigint} tradeId
+ * @param {bigint|string|number|null} amountWei
+ */
+export async function setEscrowAmountByManagerTrade(
+  managerAddress,
+  tradeId,
+  amountWei,
+) {
+  if (!managerAddress)
+    throw new Error("setEscrowAmountByManagerTrade: managerAddress required");
+  if (tradeId === null || tradeId === undefined)
+    throw new Error("setEscrowAmountByManagerTrade: tradeId required");
+  const sql = `
+    UPDATE escrows
+    SET amount_wei = $1
+    WHERE manager_address = $2 AND trade_id = $3
+    RETURNING *
+  `;
+  const res = await query(sql, [
+    toDbAmount(amountWei),
+    managerAddress,
+    String(tradeId),
+  ]);
+  return rowToEscrow(res.rows[0]);
+}
+/**
+ * Convenience to set status message id by (manager, tradeId).
+ * @param {string} managerAddress
+ * @param {string|number|bigint} tradeId
+ * @param {string|null} statusMessageId
+ */
+export async function setStatusMessageIdByManagerTrade(
+  managerAddress,
+  tradeId,
+  statusMessageId,
+) {
+  return setEscrowDiscordContextByManagerTrade(managerAddress, tradeId, {
+    statusMessageId,
+  });
+}
+
+/**
+ * Fetch a single escrow by (manager, tradeId).
+ * @param {string} managerAddress
+ * @param {string|number|bigint} tradeId
+ * @returns {Promise<object|null>}
+ */
+export async function getEscrowByManagerTrade(managerAddress, tradeId) {
+  const res = await query(
+    `SELECT * FROM escrows WHERE manager_address = $1 AND trade_id = $2 LIMIT 1`,
+    [managerAddress, String(tradeId)],
+  );
+  if (res.rowCount === 0) return null;
+  return rowToEscrow(res.rows[0]);
+}
+
 export default {
   ESCROW_STATUS,
   statusLabel,
@@ -493,4 +825,13 @@ export default {
   markCompleted,
   markCancelled,
   markDisputed,
+  // Amis (manager + tradeId)
+  upsertEscrowByManagerTrade,
+  recordAmisTradeCreation,
+  setEscrowStatusByManagerTrade,
+  setEscrowDiscordContextByManagerTrade,
+  setEscrowPartiesByManagerTrade,
+  setEscrowAmountByManagerTrade,
+  setStatusMessageIdByManagerTrade,
+  getEscrowByManagerTrade,
 };

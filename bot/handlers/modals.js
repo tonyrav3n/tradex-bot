@@ -27,7 +27,7 @@ import {
   buildAgreeRow,
 } from "../utils/components.js";
 import { updateEphemeralOriginal } from "../utils/ephemeral.js";
-import { createAndAnnounceTrade } from "../utils/tradeFlow.js";
+import { createAndAnnounceAmisTrade } from "../utils/amisTradeFlow.js";
 import { convertUsdToEth } from "../utils/fx.js";
 import {
   normalizeAndValidateAddress,
@@ -144,6 +144,11 @@ async function handleBuyerAddressModal(client, interaction) {
   if (flow?.counterpartyId) {
     await setFlow(flow.counterpartyId, { buyerAgreed: true });
   }
+  // Quick feedback to user to avoid “thinking” hang
+  await interaction.editReply({
+    content: "✅ Buyer address registered.",
+    flags: MessageFlags.Ephemeral,
+  });
 
   // Update the agree row UI state
   {
@@ -168,84 +173,89 @@ async function handleBuyerAddressModal(client, interaction) {
   }
 
   const f = await getFlow(uid);
-  // If both parties agreed and provided addresses, create the trade
+  // If both parties agreed and provided addresses, create the trade (fire-and-forget; guard against duplicates)
   if (
     f?.buyerAgreed &&
     f?.sellerAgreed &&
     f?.buyerAddress &&
-    f?.sellerAddress
+    f?.sellerAddress &&
+    !f?.tradeId
   ) {
-    // Prevent identical buyer/seller addresses
-    if (
-      String(f.buyerAddress).toLowerCase() ===
-      String(f.sellerAddress).toLowerCase()
-    ) {
-      await interaction.channel.send({
-        content: "⚠️ Buyer and Seller addresses must be different.",
-      });
-      return;
-    }
-    try {
-      // Pin ETH at creation from USD price and store
-      const priceUsdStr = String(f?.priceUsd ?? "0");
-      let pinnedEth = null;
-      try {
-        const conv = await convertUsdToEth(priceUsdStr);
-        pinnedEth = conv.eth;
-        await setPriceEthAtCreation(uid, pinnedEth);
-        if (f?.counterpartyId) {
-          await setPriceEthAtCreation(f.counterpartyId, pinnedEth);
-        }
-      } catch (e2) {
-        console.error("Failed to pin ETH at creation:", e2);
+    (async () => {
+      // Prevent identical buyer/seller addresses
+      if (
+        String(f.buyerAddress).toLowerCase() ===
+        String(f.sellerAddress).toLowerCase()
+      ) {
+        await interaction.channel.send({
+          content: "⚠️ Buyer and Seller addresses must be different.",
+        });
+        return;
       }
-
-      const result = await createAndAnnounceTrade({
-        channel: interaction.channel,
-        uid,
-        buyerAddress: f.buyerAddress,
-        sellerAddress: f.sellerAddress,
-        amountEth: pinnedEth ?? undefined,
-      });
-
       try {
-        const freshFlow = await getFlow(uid);
-        const { buyerId } = resolveLockedRoles(freshFlow, uid);
-        const usdDisplay = priceUsdStr;
-        const baseEthStr = pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
-        const baseEthNum = parseFloat(String(baseEthStr));
-        const buyerFeeEthNum = Number.isFinite(baseEthNum)
-          ? baseEthNum * 0.025
-          : null;
-        const buyerTotalEthNum = Number.isFinite(baseEthNum)
-          ? baseEthNum * 1.025
-          : null;
-        const fmt = (n, d = 6) =>
-          n != null && Number.isFinite(n)
-            ? Number(n)
-                .toFixed(d)
-                .replace(/(\.\d*?[1-9])0+$/u, "$1")
-                .replace(/\.0+$/u, ".0")
-                .replace(/\.$/u, "")
-            : "0";
-        if (result?.escrowAddress && buyerId) {
-          await interaction.channel.send({
-            content:
-              `💸 <@${buyerId}> Funding details:\n` +
-              `• Escrow amount (base): ${fmt(baseEthNum)} ETH (~$${usdDisplay})\n` +
-              `• Buyer fee (2.5%): ${fmt(buyerFeeEthNum)} ETH\n` +
-              `• Total to send: ${fmt(buyerTotalEthNum)} ETH\n` +
-              `Send to: \`${result.escrowAddress}\``,
-          });
+        // Pin ETH at creation from USD price and store
+        const priceUsdStr = String(f?.priceUsd ?? "0");
+        let pinnedEth = null;
+        try {
+          const conv = await convertUsdToEth(priceUsdStr);
+          pinnedEth = conv.eth;
+          await setPriceEthAtCreation(uid, pinnedEth);
+          if (f?.counterpartyId) {
+            await setPriceEthAtCreation(f.counterpartyId, pinnedEth);
+          }
+        } catch (e2) {
+          console.error("Failed to pin ETH at creation:", e2);
         }
-      } catch (e2) {
-        console.error("Funding prompt failed:", e2);
+
+        const result = await createAndAnnounceAmisTrade({
+          channel: interaction.channel,
+          uid,
+          buyerAddress: f.buyerAddress,
+          sellerAddress: f.sellerAddress,
+          amountEth: pinnedEth ?? undefined,
+        });
+
+        try {
+          const freshFlow = await getFlow(uid);
+          const { buyerId } = resolveLockedRoles(freshFlow, uid);
+          const usdDisplay = priceUsdStr;
+          const baseEthStr =
+            pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
+          const baseEthNum = parseFloat(String(baseEthStr));
+          const buyerFeeEthNum = Number.isFinite(baseEthNum)
+            ? baseEthNum * 0.025
+            : null;
+          const buyerTotalEthNum = Number.isFinite(baseEthNum)
+            ? baseEthNum * 1.025
+            : null;
+          const fmt = (n, d = 6) =>
+            n != null && Number.isFinite(n)
+              ? Number(n)
+                  .toFixed(d)
+                  .replace(/(\.\d*?[1-9])0+$/u, "$1")
+                  .replace(/\.0+$/u, ".0")
+                  .replace(/\.$/u, "")
+              : "0";
+          if (result?.tradeId && buyerId) {
+            await interaction.channel.send({
+              content:
+                `💸 <@${buyerId}> Funding details:\n` +
+                `• Escrow amount (base): ${fmt(baseEthNum)} ETH (~$${usdDisplay})\n` +
+                `• Buyer fee (2.5%): ${fmt(buyerFeeEthNum)} ETH\n` +
+                `• Total to send: ${fmt(buyerTotalEthNum)} ETH\n` +
+                `• Trade ID: ${result.tradeId}\n` +
+                `Use your wallet to call fund(tradeId) with the total amount.`,
+            });
+          }
+        } catch (e2) {
+          console.error("Funding prompt failed:", e2);
+        }
+      } catch (e) {
+        await interaction.channel.send({
+          content: `❌ Failed to create trade: ${e.message}`,
+        });
       }
-    } catch (e) {
-      await interaction.channel.send({
-        content: `❌ Failed to create trade: ${e.message}`,
-      });
-    }
+    })();
   }
 
   await interaction.editReply({
@@ -292,6 +302,11 @@ async function handleSellerAddressModal(client, interaction) {
   if (flow?.counterpartyId) {
     await setFlow(flow.counterpartyId, { sellerAgreed: true });
   }
+  // Quick feedback to user to avoid “thinking” hang
+  await interaction.editReply({
+    content: "✅ Seller address registered.",
+    flags: MessageFlags.Ephemeral,
+  });
 
   // Update the agree row UI state
   {
@@ -320,84 +335,89 @@ async function handleSellerAddressModal(client, interaction) {
   });
 
   const f = await getFlow(uid);
-  // If both parties agreed and provided addresses, create the trade
+  // If both parties agreed and provided addresses, create the trade (fire-and-forget; guard against duplicates)
   if (
     f?.buyerAgreed &&
     f?.sellerAgreed &&
     f?.buyerAddress &&
-    f?.sellerAddress
+    f?.sellerAddress &&
+    !f?.tradeId
   ) {
-    // Prevent identical buyer/seller addresses
-    if (
-      String(f.buyerAddress).toLowerCase() ===
-      String(f.sellerAddress).toLowerCase()
-    ) {
-      await interaction.channel.send({
-        content: "⚠️ Buyer and Seller addresses must be different.",
-      });
-      return;
-    }
-    try {
-      // Pin ETH at creation from USD price and store
-      const priceUsdStr = String(f?.priceUsd ?? "0");
-      let pinnedEth = null;
-      try {
-        const conv = await convertUsdToEth(priceUsdStr);
-        pinnedEth = conv.eth;
-        await setPriceEthAtCreation(uid, pinnedEth);
-        if (f?.counterpartyId) {
-          await setPriceEthAtCreation(f.counterpartyId, pinnedEth);
-        }
-      } catch (e2) {
-        console.error("Failed to pin ETH at creation:", e2);
+    (async () => {
+      // Prevent identical buyer/seller addresses
+      if (
+        String(f.buyerAddress).toLowerCase() ===
+        String(f.sellerAddress).toLowerCase()
+      ) {
+        await interaction.channel.send({
+          content: "⚠️ Buyer and Seller addresses must be different.",
+        });
+        return;
       }
-
-      const result = await createAndAnnounceTrade({
-        channel: interaction.channel,
-        uid,
-        buyerAddress: f.buyerAddress,
-        sellerAddress: f.sellerAddress,
-        amountEth: pinnedEth ?? undefined,
-      });
-
       try {
-        const freshFlow = await getFlow(uid);
-        const { buyerId } = resolveLockedRoles(freshFlow, uid);
-        const usdDisplay = priceUsdStr;
-        const baseEthStr = pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
-        const baseEthNum = parseFloat(String(baseEthStr));
-        const buyerFeeEthNum = Number.isFinite(baseEthNum)
-          ? baseEthNum * 0.025
-          : null;
-        const buyerTotalEthNum = Number.isFinite(baseEthNum)
-          ? baseEthNum * 1.025
-          : null;
-        const fmt = (n, d = 6) =>
-          n != null && Number.isFinite(n)
-            ? Number(n)
-                .toFixed(d)
-                .replace(/(\.\d*?[1-9])0+$/u, "$1")
-                .replace(/\.0+$/u, ".0")
-                .replace(/\.$/u, "")
-            : "0";
-        if (result?.escrowAddress && buyerId) {
-          await interaction.channel.send({
-            content:
-              `💸 <@${buyerId}> Funding details:\n` +
-              `• Escrow amount (base): ${fmt(baseEthNum)} ETH (~$${usdDisplay})\n` +
-              `• Buyer fee (2.5%): ${fmt(buyerFeeEthNum)} ETH\n` +
-              `• Total to send: ${fmt(buyerTotalEthNum)} ETH\n` +
-              `Send to: \`${result.escrowAddress}\``,
-          });
+        // Pin ETH at creation from USD price and store
+        const priceUsdStr = String(f?.priceUsd ?? "0");
+        let pinnedEth = null;
+        try {
+          const conv = await convertUsdToEth(priceUsdStr);
+          pinnedEth = conv.eth;
+          await setPriceEthAtCreation(uid, pinnedEth);
+          if (f?.counterpartyId) {
+            await setPriceEthAtCreation(f.counterpartyId, pinnedEth);
+          }
+        } catch (e2) {
+          console.error("Failed to pin ETH at creation:", e2);
         }
-      } catch (e2) {
-        console.error("Funding prompt failed:", e2);
+
+        const result = await createAndAnnounceAmisTrade({
+          channel: interaction.channel,
+          uid,
+          buyerAddress: f.buyerAddress,
+          sellerAddress: f.sellerAddress,
+          amountEth: pinnedEth ?? undefined,
+        });
+
+        try {
+          const freshFlow = await getFlow(uid);
+          const { buyerId } = resolveLockedRoles(freshFlow, uid);
+          const usdDisplay = priceUsdStr;
+          const baseEthStr =
+            pinnedEth ?? (await convertUsdToEth(usdDisplay)).eth;
+          const baseEthNum = parseFloat(String(baseEthStr));
+          const buyerFeeEthNum = Number.isFinite(baseEthNum)
+            ? baseEthNum * 0.025
+            : null;
+          const buyerTotalEthNum = Number.isFinite(baseEthNum)
+            ? baseEthNum * 1.025
+            : null;
+          const fmt = (n, d = 6) =>
+            n != null && Number.isFinite(n)
+              ? Number(n)
+                  .toFixed(d)
+                  .replace(/(\.\d*?[1-9])0+$/u, "$1")
+                  .replace(/\.0+$/u, ".0")
+                  .replace(/\.$/u, "")
+              : "0";
+          if (result?.tradeId && buyerId) {
+            await interaction.channel.send({
+              content:
+                `💸 <@${buyerId}> Funding details:\n` +
+                `• Escrow amount (base): ${fmt(baseEthNum)} ETH (~$${usdDisplay})\n` +
+                `• Buyer fee (2.5%): ${fmt(buyerFeeEthNum)} ETH\n` +
+                `• Total to send: ${fmt(buyerTotalEthNum)} ETH\n` +
+                `• Trade ID: ${result.tradeId}\n` +
+                `Use your wallet to call fund(tradeId) with the total amount.`,
+            });
+          }
+        } catch (e2) {
+          console.error("Funding prompt failed:", e2);
+        }
+      } catch (e) {
+        await interaction.channel.send({
+          content: `❌ Failed to create trade: ${e.message}`,
+        });
       }
-    } catch (e) {
-      await interaction.channel.send({
-        content: `❌ Failed to create trade: ${e.message}`,
-      });
-    }
+    })();
   }
 }
 

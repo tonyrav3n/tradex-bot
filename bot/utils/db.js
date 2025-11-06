@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // Default migrations directory: <repo>/bot/migrations
 const DEFAULT_MIGRATIONS_DIR = path.resolve(process.cwd(), "bot", "migrations");

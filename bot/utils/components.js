@@ -271,7 +271,7 @@ export function buildEscrowStatusEmbed({
 } = {}) {
   const s = String(statusText ?? "").toLowerCase();
   let nextAction = null;
-  if (s === "created") nextAction = "buyer to fund escrow";
+  if (s === "created") nextAction = "buyer to fund trade";
   else if (s === "funded") nextAction = "seller to deliver";
   else if (s === "delivered") nextAction = "buyer to approve & release";
 
@@ -322,7 +322,7 @@ export function buildEscrowStatusEmbed({
         inline: true,
       },
       {
-        name: "\nEscrow",
+        name: "\nContract",
         value: escrowAddress
           ? `[${escrowAddress}](${buildEtherscanAddressUrl(escrowAddress)})`
           : "—",

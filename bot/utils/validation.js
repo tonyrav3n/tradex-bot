@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { isAddress, getAddress } from "viem";
 import { publicClient } from "./client.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 

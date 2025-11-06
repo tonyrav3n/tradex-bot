@@ -5,7 +5,7 @@ import path from "path";
 import { Client, GatewayIntentBits, Collection } from "discord.js";
 import { initDb } from "./utils/db.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const TOKEN = process.env.TOKEN || "";
 const GUILD_ID = process.env.GUILD_ID || "";

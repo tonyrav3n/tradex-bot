@@ -80,6 +80,10 @@ function rowToFlow(row) {
     escrowAddress: row.escrow_address ?? null,
     escrowStatusMessageId: row.escrow_status_message_id ?? null,
     escrowWatcherStarted: Boolean(row.escrow_watcher_started),
+    tradeId:
+      row.trade_id !== null && row.trade_id !== undefined
+        ? String(row.trade_id)
+        : null,
 
     // audit
     createdAt: row.created_at ?? null,
@@ -120,6 +124,7 @@ function baseFlow(userId) {
     escrowAddress: null,
     escrowStatusMessageId: null,
     escrowWatcherStarted: false,
+    tradeId: null,
   };
 }
 
@@ -171,6 +176,9 @@ function flowToValues(flow, userId) {
     flow.escrowAddress ?? null,
     flow.escrowStatusMessageId ?? null,
     Boolean(flow.escrowWatcherStarted),
+    flow.tradeId !== undefined && flow.tradeId !== null
+      ? String(flow.tradeId)
+      : null,
   ];
 }
 
@@ -197,6 +205,7 @@ const columns = [
   "escrow_address",
   "escrow_status_message_id",
   "escrow_watcher_started",
+  "trade_id",
 ];
 
 /**

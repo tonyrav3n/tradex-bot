@@ -1,18 +1,19 @@
 /**
- * Button interaction handlers extracted from the monolithic interactionCreate.js.
+ * Button interaction handlers for trade flow and Amis manager actions.
  *
  * Responsibilities:
  * - Handle button customIds:
  *   - create_trade_button (demo)
  *   - create_trade_flow_button
  *   - role_buyer / role_seller
- *   - create_
  *   - agree_buyer / agree_seller
  *   - mark_delivered / approve_release
+ *   - prefund_quote
  *
  * Notes:
  * - This module focuses on button interactions only. Modal submits and user selects
  *   should remain in their respective handlers/modules.
+ * - Uses AmisEscrowManager (tradeId-based). Buyer funds via fund(tradeId).
  * - We lock buyer/seller Discord IDs at thread creation to keep permissions consistent.
  */
 
@@ -38,15 +39,6 @@ import { updateEphemeralOriginal } from "../utils/ephemeral.js";
 import { publicClient } from "../utils/client.js";
 import { convertUsdToEth } from "../utils/fx.js";
 import { safeThreadPatchMessage } from "../utils/threads.js";
-import {
-  getEscrowState,
-  markEscrowDelivered,
-  approveEscrowDelivery,
-} from "../utils/escrow.js";
-import {
-  markDelivered as dbMarkDelivered,
-  markCompleted as dbMarkCompleted,
-} from "../utils/escrowRepo.js";
 
 /**
  * Update the escrow status message if known, with the provided embed and action components
@@ -342,17 +334,22 @@ async function handleMarkDelivered(interaction) {
     });
     return;
   }
-  const escrowAddress = flow.escrowAddress;
-  if (!escrowAddress) {
+  const tradeId = flow.tradeId;
+  if (!tradeId) {
     await interaction.editReply({
-      content: "⚠️ Escrow is not created yet.",
+      content: "⚠️ Trade is not created yet.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
   try {
-    const state = await getEscrowState(escrowAddress);
+    const { getTradeState, markDelivered: amisMarkDelivered } = await import(
+      "../utils/amis.js"
+    );
+    const { AMIS_ADDRESS } = await import("../utils/amisContract.js");
+
+    const state = await getTradeState(tradeId);
     if (Number(state.status) !== 1) {
       await interaction.editReply({
         content: "⚠️ Trade is not at 'Funded' state.",
@@ -364,7 +361,7 @@ async function handleMarkDelivered(interaction) {
     const { keyFor, checkCooldown, withLockThenCooldown } = await import(
       "../utils/locks.js"
     );
-    const rateKey = keyFor("mark_delivered", escrowAddress);
+    const rateKey = keyFor("mark_delivered", String(tradeId));
     const cd = checkCooldown(rateKey);
     if (!cd.ok) {
       await interaction.editReply({
@@ -374,7 +371,7 @@ async function handleMarkDelivered(interaction) {
       return;
     }
     const res = await withLockThenCooldown(rateKey, 10000, 5000, async () => {
-      const tx = await markEscrowDelivered(escrowAddress);
+      const tx = await amisMarkDelivered(tradeId);
       await publicClient.waitForTransactionReceipt({ hash: tx });
       return tx;
     });
@@ -393,21 +390,14 @@ async function handleMarkDelivered(interaction) {
       return;
     }
 
-    try {
-      await dbMarkDelivered(escrowAddress);
-    } catch (e) {
-      // non-fatal DB persistence failure
-      console.error("DB persist delivered failed:", e);
-    }
-
-    const updated = await getEscrowState(escrowAddress);
+    const updated = await getTradeState(tradeId);
     const { buyerId: buyerId2, sellerId: sellerId2 } = resolveLockedRoles(
       flow,
       uid,
     );
 
     const embed2 = buildEscrowStatusEmbed({
-      escrowAddress,
+      escrowAddress: AMIS_ADDRESS,
       buyerId: buyerId2,
       sellerId: sellerId2,
       statusText: updated.statusText,
@@ -425,8 +415,6 @@ async function handleMarkDelivered(interaction) {
     });
     // Post a countdown banner and release breakdown
     try {
-      // removed unused payout calculations
-
       // Chain-aware deadline from on-chain deliveryTimestamp + releaseTimeout (fallback to 24h from now)
       const deliveredAt = Number(updated?.deliveredAtSec ?? 0);
       const timeoutSec = Number(updated?.releaseTimeoutSec ?? 0);
@@ -434,8 +422,6 @@ async function handleMarkDelivered(interaction) {
         deliveredAt > 0 && timeoutSec > 0
           ? deliveredAt + timeoutSec
           : Math.floor(Date.now() / 1000) + 24 * 60 * 60;
-
-      // removed escrow link line
 
       const lines = [
         `⏳ Auto‑release available at: <t:${deadline}:F> (that is <t:${deadline}:R>).`,
@@ -483,17 +469,21 @@ async function handleApproveRelease(interaction) {
     });
     return;
   }
-  const escrowAddress = flow.escrowAddress;
-  if (!escrowAddress) {
+  const tradeId = flow.tradeId;
+  if (!tradeId) {
     await interaction.editReply({
-      content: "⚠️ Escrow is not created yet.",
+      content: "⚠️ Trade is not created yet.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
   try {
-    const state = await getEscrowState(escrowAddress);
+    const { getTradeState, approveDelivery: amisApproveDelivery } =
+      await import("../utils/amis.js");
+    const { AMIS_ADDRESS } = await import("../utils/amisContract.js");
+
+    const state = await getTradeState(tradeId);
     if (Number(state.status) !== 2) {
       await interaction.editReply({
         content: "⚠️ Trade is not at 'Delivered' state.",
@@ -505,7 +495,7 @@ async function handleApproveRelease(interaction) {
     const { keyFor, checkCooldown, withLockThenCooldown } = await import(
       "../utils/locks.js"
     );
-    const rateKey = keyFor("approve_release", escrowAddress);
+    const rateKey = keyFor("approve_release", String(tradeId));
     const cd = checkCooldown(rateKey);
     if (!cd.ok) {
       await interaction.editReply({
@@ -540,7 +530,7 @@ async function handleApproveRelease(interaction) {
       console.warn("Release breakdown preflight failed:", err);
     }
     const res = await withLockThenCooldown(rateKey, 10000, 5000, async () => {
-      const tx = await approveEscrowDelivery(escrowAddress);
+      const tx = await amisApproveDelivery(tradeId);
       await publicClient.waitForTransactionReceipt({ hash: tx });
       return tx;
     });
@@ -559,21 +549,14 @@ async function handleApproveRelease(interaction) {
       return;
     }
 
-    try {
-      await dbMarkCompleted(escrowAddress);
-    } catch (e) {
-      // non-fatal DB persistence failure
-      console.error("DB persist completed failed:", e);
-    }
-
-    const updated = await getEscrowState(escrowAddress);
+    const updated = await getTradeState(tradeId);
     const { buyerId: buyerId2, sellerId: sellerId2 } = resolveLockedRoles(
       flow,
       uid,
     );
 
     const embed2 = buildEscrowStatusEmbed({
-      escrowAddress,
+      escrowAddress: AMIS_ADDRESS,
       buyerId: buyerId2,
       sellerId: sellerId2,
       statusText: updated.statusText,
@@ -635,18 +618,19 @@ async function handlePreFundQuote(interaction) {
     });
     return;
   }
-  const escrowAddress = flow?.escrowAddress;
-  if (!escrowAddress) {
+  const tradeId = flow?.tradeId;
+  if (!tradeId) {
     await interaction.editReply({
       content:
-        "ℹ️ Escrow isn’t created yet. The quote is only available after the escrow has been created (awaiting funding).",
+        "ℹ️ Trade isn’t created yet. The quote is only available after the trade has been created (awaiting funding).",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
-  // Allow the pre‑fund quote only while the escrow is in Created (awaiting funding)
+  // Allow the pre‑fund quote only while the trade is in Created (awaiting funding)
   try {
-    const state = await getEscrowState(escrowAddress);
+    const { getTradeState } = await import("../utils/amis.js");
+    const state = await getTradeState(tradeId);
     if (Number(state?.status) !== 0) {
       await interaction.editReply({
         content:
@@ -656,7 +640,7 @@ async function handlePreFundQuote(interaction) {
       return;
     }
   } catch {
-    // If we cannot read state, proceed with caution (escrow exists)
+    // If we cannot read state, proceed with caution (trade exists)
   }
 
   // Prefer pinned ETH at creation; fallback to live FX from USD if available
@@ -687,13 +671,15 @@ async function handlePreFundQuote(interaction) {
       .replace(/\.0+$/u, ".0")
       .replace(/\.$/u, "");
 
+  const { AMIS_ADDRESS } = await import("../utils/amisContract.js");
   const lines = [
     `Pre‑fund quote (buyer):`,
     `• Escrow amount (base): ${fmt(baseEth)} ETH`,
     `• Buyer fee (2.5%): ${fmt(buyerFee)} ETH`,
     `• Total to send: ${fmt(totalEth)} ETH`,
-    `• Escrow address: \`${escrowAddress}\``,
-    `Network: Sepolia`,
+    `• Trade ID: ${tradeId}`,
+    `• Contract: \`${AMIS_ADDRESS}\``,
+    `Use your wallet to call fund(tradeId) with the total amount.`,
   ];
   await interaction.editReply({
     content: lines.join("\n"),

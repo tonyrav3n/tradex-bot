@@ -3,7 +3,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import * as chains from "viem/chains";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const NETWORK_PRIVATE_KEY = process.env.NETWORK_PRIVATE_KEY;
 const NETWORK_RPC_URL = process.env.NETWORK_RPC_URL;
