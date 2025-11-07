@@ -25,7 +25,7 @@
  *   });
  */
 
-import { parseEther } from "viem";
+import { parseEther } from "ethers";
 import { AMIS_ADDRESS } from "./amisContract.js";
 import {
   createTrade as amisCreateTrade,

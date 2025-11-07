@@ -16,7 +16,7 @@
  *   and call data, but should not send funds for the user.
  */
 
-import { decodeEventLog, formatEther, parseAbiItem } from "viem";
+import { formatEther, Interface } from "ethers";
 import { publicClient, walletClient, account } from "./client.js";
 import { AMIS_ABI, AMIS_ADDRESS } from "./amisContract.js";
 import {
@@ -98,7 +98,7 @@ export async function getTrade(tradeId) {
     functionName: "trades",
     args: [id],
   });
-  // viem returns the struct either as an array-like or named props depending on ABI
+  // ethers returns struct objects with both index-based and named properties; normalize to a consistent shape
   const obj =
     res && typeof res === "object"
       ? res
@@ -271,13 +271,9 @@ export async function buildFundRequest(tradeId) {
   const t = await getTrade(id);
   const value = buyerTotalWeiFromBaseWei(t.amount);
   // Encode the calldata for fund(tradeId)
-  // Using viem's encodeFunctionData via parseAbiItem for portability
-  const abiItem = parseAbiItem("function fund(uint256 tradeId) payable");
-  const { data } = await publicClient.encodeFunctionData({
-    abi: [abiItem],
-    functionName: "fund",
-    args: [id],
-  });
+  // Encode fund(tradeId) calldata via ethers Interface
+  const iface = new Interface(["function fund(uint256 tradeId) payable"]);
+  const data = iface.encodeFunctionData("fund", [id]);
   return {
     to: AMIS_ADDRESS,
     data,
@@ -475,14 +471,15 @@ export async function deriveTradeIdFromTx(txHash) {
   // Try strict decode first using ABI
   for (const log of receipt.logs) {
     try {
-      const decoded = decodeEventLog({
-        abi: AMIS_ABI,
-        data: log.data,
-        topics: log.topics,
-      });
-      if (decoded?.eventName === "Created") {
-        const tradeId = BigInt(decoded?.args?.tradeId ?? 0n);
-        if (tradeId > 0n) return tradeId;
+      const iface = new Interface(AMIS_ABI);
+      try {
+        const parsed = iface.parseLog(log);
+        if (parsed?.name === "Created") {
+          const tradeId = BigInt(parsed?.args?.tradeId ?? 0n);
+          if (tradeId > 0n) return tradeId;
+        }
+      } catch {
+        // ignore
       }
     } catch {
       // fallthrough
@@ -490,18 +487,14 @@ export async function deriveTradeIdFromTx(txHash) {
   }
 
   // Fallback: attempt parsing with a minimal ABI item (robust to artifact differences)
-  const createdItem = parseAbiItem(
+  const fallbackIface = new Interface([
     "event Created(uint256 indexed tradeId, address indexed buyer, address indexed seller, uint256 amount)",
-  );
+  ]);
   for (const log of receipt.logs) {
     try {
-      const decoded = decodeEventLog({
-        abi: [createdItem],
-        data: log.data,
-        topics: log.topics,
-      });
-      if (decoded?.eventName === "Created") {
-        const tradeId = BigInt(decoded?.args?.tradeId ?? 0n);
+      const parsed = fallbackIface.parseLog(log);
+      if (parsed?.name === "Created") {
+        const tradeId = BigInt(parsed?.args?.tradeId ?? 0n);
         if (tradeId > 0n) return tradeId;
       }
     } catch {

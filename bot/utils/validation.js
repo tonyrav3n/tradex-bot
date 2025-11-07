@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { isAddress, getAddress } from "viem";
+import { isAddress, getAddress } from "ethers";
 import { publicClient } from "./client.js";
 
 dotenv.config({ quiet: true });
@@ -57,8 +57,8 @@ export async function checkEoa(checksumAddress) {
  * Normalize and validate an Ethereum address with optional EOA enforcement.
  *
  * Behavior:
- * - Syntactic validation via viem's isAddress.
- * - Normalization to EIP-55 checksummed format via viem's getAddress.
+ * - Syntactic validation via ethers's isAddress.
+ * - Normalization to EIP-55 checksummed format via ethers's getAddress.
  * - Rejects zero address.
  * - If enforceEoa=true, rejects contract addresses (non-empty bytecode).
  *
