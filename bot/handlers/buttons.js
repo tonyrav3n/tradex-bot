@@ -235,6 +235,27 @@ async function handleCreateThread(client, interaction) {
  * Show the buyer address modal (buyer only).
  */
 async function handleAgreeBuyer(interaction) {
+  const uid = interaction.user.id;
+  // Early role enforcement: user must be the buyer before we even show the modal
+  try {
+    const flow = await getFlow(uid);
+    const check = assertBuyer(uid, flow);
+    if (!check.ok) {
+      await interaction.reply({
+        content: `⚠️ ${check.message}`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+  } catch (e) {
+    console.error("handleAgreeBuyer: pre-check failed:", e);
+    await interaction.reply({
+      content: "⚠️ Could not verify your role. Please try again shortly.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   try {
     await interaction.showModal(buildBuyerAddressModal());
   } catch (e) {
@@ -274,6 +295,27 @@ async function handleAgreeBuyer(interaction) {
  * Show the seller address modal (seller only).
  */
 async function handleAgreeSeller(interaction) {
+  const uid = interaction.user.id;
+  // Early role enforcement: user must be the seller before we show the modal
+  try {
+    const flow = await getFlow(uid);
+    const check = assertSeller(uid, flow);
+    if (!check.ok) {
+      await interaction.reply({
+        content: `⚠️ ${check.message}`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+  } catch (e) {
+    console.error("handleAgreeSeller: pre-check failed:", e);
+    await interaction.reply({
+      content: "⚠️ Could not verify your role. Please try again shortly.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   try {
     await interaction.showModal(buildSellerAddressModal());
   } catch (e) {
