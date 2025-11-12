@@ -140,20 +140,32 @@ export const publicClient = {
       }
       const filter = filterFactory(...params);
 
-      const listener = async (log) => {
+      const listener = async (...eventArgs) => {
         try {
-          // log is a raw Log, decode it
-          const parsed = c.interface.parseLog(log);
-          // Build args object keyed by input names
+          const event = eventArgs[eventArgs.length - 1];
+          const log = event?.log ?? event;
+          const valuesArray =
+            Array.isArray(event?.args) &&
+            event.args.length >= frag.inputs.length
+              ? event.args
+              : eventArgs.slice(0, -1);
+
           const outArgs = {};
-          parsed.fragment.inputs.forEach((inp, idx) => {
-            outArgs[inp.name] = parsed.args[idx];
+          frag.inputs.forEach((inp, idx) => {
+            if (valuesArray && valuesArray[idx] !== undefined) {
+              outArgs[inp.name] = valuesArray[idx];
+            } else if (event?.args && event.args[inp.name] !== undefined) {
+              outArgs[inp.name] = event.args[inp.name];
+            } else {
+              outArgs[inp.name] = undefined;
+            }
           });
 
           const normalized = {
             args: outArgs,
-            transactionHash: log.transactionHash,
-            logIndex: log.logIndex,
+            transactionHash:
+              log?.transactionHash ?? event?.transactionHash ?? null,
+            logIndex: log?.logIndex ?? event?.logIndex ?? null,
           };
           if (typeof onLogs === "function") {
             await onLogs([normalized]);
@@ -164,12 +176,12 @@ export const publicClient = {
         }
       };
 
-      provider.on(filter, listener);
+      c.on(filter, listener);
 
       // Return unwatch function
       return () => {
         try {
-          provider.off(filter, listener);
+          c.off(filter, listener);
         } catch (e) {
           console.error("watchContractEvent unwatch error:", e);
         }

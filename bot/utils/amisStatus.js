@@ -93,27 +93,79 @@ export async function initAmisStatusAndWatcher({
     (flow.role === "seller" ? uid : flow.counterpartyId) ??
     null;
 
-  // Create the status embed if not present
+  // Create the status embed if not present (or if the stored message is gone)
   try {
-    const haveMessageId = Boolean(flow.escrowStatusMessageId);
-    if (!haveMessageId) {
-      const state = await safeGetTradeState(tradeId);
+    let storedMessageId = flow.escrowStatusMessageId ?? null;
+    let existingMessage = null;
 
-      const statusEmbed = buildEscrowStatusEmbed({
-        escrowAddress: AMIS_ADDRESS, // show manager address for explorer link
-        buyerId,
-        sellerId,
-        statusText: state?.statusText ?? "Created",
-        amountEth: state?.amountEth ?? "0",
-        title,
-        description: initialDescription,
-        priceUsd,
-      });
+    if (
+      storedMessageId &&
+      channel?.messages &&
+      typeof channel.messages.fetch === "function"
+    ) {
+      try {
+        existingMessage = await channel.messages.fetch(storedMessageId);
+        messageId = existingMessage?.id ?? null;
+      } catch (fetchErr) {
+        console.warn(
+          "initAmisStatusAndWatcher: stored status message missing, recreating",
+          fetchErr?.message ?? fetchErr,
+        );
+        storedMessageId = null;
+        messageId = null;
 
-      const components = buildActionsForStatus(
-        state?.status ?? state?.statusText,
-      );
+        try {
+          await setFlow(uid, { escrowStatusMessageId: null });
+          if (flow?.counterpartyId) {
+            await setFlow(flow.counterpartyId, { escrowStatusMessageId: null });
+          }
+        } catch (persistErr) {
+          console.error(
+            "initAmisStatusAndWatcher: failed to clear stale message id:",
+            persistErr,
+          );
+        }
+      }
+    } else if (storedMessageId) {
+      // messages.fetch is unavailable for this channel type
+      storedMessageId = null;
+      messageId = null;
+    }
 
+    const state = await safeGetTradeState(tradeId);
+
+    const statusEmbed = buildEscrowStatusEmbed({
+      escrowAddress: AMIS_ADDRESS, // show manager address for explorer link
+      buyerId,
+      sellerId,
+      statusText: state?.statusText ?? "Created",
+      amountEth: state?.amountEth ?? "0",
+      title,
+      description: initialDescription,
+      priceUsd,
+    });
+
+    const components = buildActionsForStatus(
+      state?.status ?? state?.statusText,
+    );
+
+    if (existingMessage && messageId) {
+      try {
+        await existingMessage.edit({
+          embeds: [statusEmbed],
+          components,
+        });
+      } catch (editErr) {
+        console.error(
+          "initAmisStatusAndWatcher: failed to edit existing status embed:",
+          editErr,
+        );
+        existingMessage = null;
+        messageId = null;
+      }
+    }
+
+    if (!existingMessage) {
       const statusMsg = await channel.send({
         embeds: [statusEmbed],
         components,
@@ -122,16 +174,20 @@ export async function initAmisStatusAndWatcher({
       messageId = statusMsg?.id ?? null;
 
       if (messageId) {
-        // Store messageId for both parties
-        await setFlow(uid, { escrowStatusMessageId: messageId });
-        if (flow?.counterpartyId) {
-          await setFlow(flow.counterpartyId, {
-            escrowStatusMessageId: messageId,
-          });
+        try {
+          await setFlow(uid, { escrowStatusMessageId: messageId });
+          if (flow?.counterpartyId) {
+            await setFlow(flow.counterpartyId, {
+              escrowStatusMessageId: messageId,
+            });
+          }
+        } catch (persistErr) {
+          console.error(
+            "initAmisStatusAndWatcher: failed to persist status message id:",
+            persistErr,
+          );
         }
       }
-    } else {
-      messageId = flow.escrowStatusMessageId;
     }
   } catch (e) {
     console.error(

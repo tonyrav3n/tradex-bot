@@ -545,7 +545,9 @@ export async function upsertEscrowByManagerTrade(escrow) {
   const sql = `
     INSERT INTO escrows (${columns.join(", ")})
     VALUES (${placeholders})
-    ON CONFLICT (manager_address, trade_id) DO UPDATE SET
+    ON CONFLICT (manager_address, trade_id)
+      WHERE manager_address IS NOT NULL AND trade_id IS NOT NULL
+      DO UPDATE SET
       ${updates}
     RETURNING *
   `;
