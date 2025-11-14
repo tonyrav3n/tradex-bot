@@ -6,11 +6,12 @@ import {
   ChannelType,
 } from 'discord.js';
 
-import { buildVerifyButtonRow, buildVerifyEmbed } from '../utils/components.js';
+import { buildVerifyButtonRow } from '../utils/components/buttons.js';
+import { buildVerifyEmbed } from '../utils/components/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('verify_setup')
-  .setDescription('Post a Verify button in a target channel (Admin only)')
+  .setDescription('Post a Verify button in a target channel')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .setContexts([InteractionContextType.Guild])
   .addChannelOption((opt) =>
