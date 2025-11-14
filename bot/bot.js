@@ -1,15 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
-import {
-  Client,
-  GatewayIntentBits,
-  Collection,
-  REST,
-  Routes,
-} from 'discord.js';
+import { Client, GatewayIntentBits, Collection } from 'discord.js';
 
-import { config, validateRequiredEnvVars } from './utils/config.js';
+import { env, validateRequiredEnvVars } from './config/env.js';
 
 validateRequiredEnvVars();
 
@@ -53,42 +47,4 @@ for (const file of eventFiles) {
   }
 }
 
-// Register commands with Discord API
-async function registerCommands() {
-  const commands = [];
-
-  for (const [name, commandModule] of client.commands) {
-    if (commandModule?.data?.toJSON) {
-      commands.push(commandModule.data.toJSON());
-      console.log(`📝 Prepared command for registration: ${name}`);
-    } else {
-      console.warn(`⚠️  Command ${name} missing data.toJSON() method`);
-    }
-  }
-
-  const rest = new REST({ version: '10' }).setToken(config.TOKEN);
-
-  try {
-    console.log(
-      `🔄 Registering ${commands.length} application (/) commands...`,
-    );
-
-    // Register to specific guild
-    const data = await rest.put(
-      Routes.applicationGuildCommands(client.user.id, config.GUILD_ID),
-      { body: commands },
-    );
-    console.log(`✅ Successfully registered ${data.length} guild commands`);
-  } catch (error) {
-    console.error('❌ Error registering commands:', error);
-  }
-}
-
-// Register commands when bot is ready
-client.once('clientReady', async () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
-  await registerCommands();
-  console.log(`🤖 Bot is ready and operational!`);
-});
-
-client.login(config.TOKEN);
+client.login(env.TOKEN);
