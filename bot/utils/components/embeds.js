@@ -5,7 +5,7 @@ import { COLORS, ASSETS } from '../../config/theme.js';
 export function buildVerifyEmbed() {
   return new EmbedBuilder()
     .setColor(COLORS.VERIFIED_GREEN)
-    .setTitle('👋 Welcome to amis.!')
+    .setTitle('Welcome to amis.!')
     .setDescription('Click on the button below to gain access.')
     .setThumbnail(ASSETS.LOGO_URL)
     .setFooter({ text: 'amis.', iconURL: ASSETS.LOGO_URL });
@@ -51,4 +51,18 @@ export function buildSayDmEmbed(msgContent, msgTitle, embedTitle, thumbnail) {
   }
 
   return embed;
+}
+
+export function buildTradeEmbed() {
+  return new EmbedBuilder()
+    .setColor(COLORS.VERIFIED_GREEN)
+    .setTitle('Start a Secure Trade')
+    .setDescription(
+      "Ready to trade? I'll help you create a secure transaction for you and your partner. Click below to begin.",
+    )
+    .setThumbnail(ASSETS.LOGO_URL)
+    .setFooter({
+      text: 'amis.',
+      iconURL: ASSETS.LOGO_URL,
+    });
 }

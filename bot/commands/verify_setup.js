@@ -1,50 +1,53 @@
+/**
+ * Verify Setup Command
+ *
+ * Admin-only slash command that sends a public verification embed with a button.
+ * New users can click the button to receive the verified role and gain access to the server.
+ *
+ * The role ID is configured via VERIFIED_ROLE_ID in the .env file.
+ *
+ * Permissions: Administrator only
+ * Context: Guild (server) only
+ *
+ * @module commands/verify_setup
+ */
+
 import {
   SlashCommandBuilder,
   PermissionFlagsBits,
-  MessageFlags,
   InteractionContextType,
-  ChannelType,
 } from 'discord.js';
 
-import { buildVerifyButtonRow } from '../utils/components/buttons.js';
+import { buildVerifyButton } from '../utils/components/buttons.js';
 import { buildVerifyEmbed } from '../utils/components/embeds.js';
 
+/**
+ * Slash command data definition
+ * Configures the /verify_setup command with admin-only permissions
+ */
 export const data = new SlashCommandBuilder()
   .setName('verify_setup')
-  .setDescription('Post a Verify button in a target channel')
+  .setDescription(`Post 'Verify' embed`)
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-  .setContexts([InteractionContextType.Guild])
-  .addChannelOption((opt) =>
-    opt
-      .setName('channel')
-      .setDescription('Channel to post the Verify button in')
-      .addChannelTypes(ChannelType.GuildText)
-      .setRequired(true),
-  );
+  .setContexts([InteractionContextType.Guild]);
 
+/**
+ * Execute the verify_setup command
+ *
+ * Sends a public message with an embed explaining the verification process
+ * and a button that users can click to get verified and access the server.
+ *
+ * @param {ChatInputCommandInteraction} interaction - The slash command interaction
+ * @returns {Promise<void>}
+ *
+ * @example
+ * // Admin types: /verify_setup
+ * // Bot sends: Embed with "Verify Me" button
+ * // New users click button to get verified role
+ */
 export async function execute(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-  const channel = interaction.options.getChannel('channel', true);
-
-  try {
-    const msg = await channel.send({
-      embeds: [buildVerifyEmbed()],
-      components: [buildVerifyButtonRow()],
-    });
-
-    return interaction.editReply({
-      content: `✅ Verify button posted in ${channel}. Link: ${msg.url}`,
-    });
-  } catch (err) {
-    console.error('verify_setup failed:', err);
-    return interaction
-      .editReply({
-        content:
-          '❌ Failed to post the Verify button. Please check my permissions for the channel.',
-      })
-      .catch((replyErr) =>
-        console.error('Failed to send error message:', replyErr),
-      );
-  }
+  await interaction.reply({
+    embeds: [buildVerifyEmbed()],
+    components: [buildVerifyButton()],
+  });
 }
