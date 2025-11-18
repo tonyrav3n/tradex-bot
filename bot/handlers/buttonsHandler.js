@@ -14,9 +14,10 @@ import { MessageFlags } from 'discord.js';
 
 import { env } from '../config/env.js';
 import {
-  buildCounterpartyBackButton,
   buildRoleButtonsRow,
+  buildCounterpartySelectBackButton,
 } from '../utils/components/buttons.js';
+import { buildTradeDetailsModal } from '../utils/components/modals.js';
 import { buildCounterpartySelect } from '../utils/components/selects.js';
 import { logger } from '../utils/logger.js';
 
@@ -49,6 +50,8 @@ export async function handleButton(interaction) {
       return await handleRoleSelectorButton(interaction, args[0]);
     case 'back_btn':
       return await handleBackButton(interaction, args);
+    case 'trade_details_btn':
+      return await handleTradeDetailsButton(interaction, args[0], args[1]);
   }
 }
 
@@ -141,10 +144,12 @@ async function handleRoleSelectorButton(interaction, role) {
 
   const selectedRole = role === 'buyer' ? 'Buyer' : 'Seller';
 
-  // Update message with counterparty selection UI
   await interaction.update({
     content: `You selected: **${selectedRole}**. Who are you trading with?`,
-    components: [buildCounterpartySelect(role), buildCounterpartyBackButton()],
+    components: [
+      buildCounterpartySelect(role),
+      buildCounterpartySelectBackButton(),
+    ],
   });
 }
 
@@ -163,18 +168,63 @@ async function handleRoleSelectorButton(interaction, role) {
  * @private
  */
 async function handleBackButton(interaction, args) {
-  const [destination, ...params] = args;
+  const [destination, role] = args;
+  const selectedRole = role === 'buyer' ? 'Buyer' : 'Seller';
 
-  logger.debug('Back button clicked:', { destination, params, args });
+  logger.button(`back_btn:${destination}:${role}`, interaction.user.id, {
+    destination,
+    role,
+  });
 
   switch (destination) {
     case 'role':
-      // Navigate back to role selection
+      logger.debug('Navigating back to role selection');
       await interaction.update({
         content: "To start, what's your side of the trade?",
         embeds: [],
         components: [buildRoleButtonsRow()],
       });
       break;
+    case 'counterparty':
+      logger.debug('Navigating back to counterparty selection', { role });
+      await interaction.update({
+        content: `You selected: **${selectedRole}**. Who are you trading with?`,
+        embeds: [],
+        components: [
+          buildCounterpartySelect(role),
+          buildCounterpartySelectBackButton(),
+        ],
+      });
+      break;
+  }
+}
+
+async function handleTradeDetailsButton(interaction, role, selectedUserId) {
+  logger.button(
+    `trade_details_btn:${role}:${selectedUserId}`,
+    interaction.user.id,
+    { role, selectedUserId },
+  );
+
+  try {
+    const modal = buildTradeDetailsModal(role, selectedUserId);
+    await interaction.showModal(modal);
+    logger.success('Trade details modal shown successfully');
+  } catch (error) {
+    logger.error('Error showing trade details modal:', error);
+    logger.debug('Modal error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    });
+
+    try {
+      await interaction.reply({
+        content: '⚠️ Failed to open trade details form. Please try again.',
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (replyError) {
+      logger.error('Failed to send error reply for modal failure:', replyError);
+    }
   }
 }

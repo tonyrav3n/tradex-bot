@@ -13,6 +13,7 @@
  */
 
 import { handleButton } from '../handlers/buttonsHandler.js';
+import { handleModal } from '../handlers/modalsHandler.js';
 import { handleSelect } from '../handlers/selectsHandler.js';
 import { logger } from '../utils/logger.js';
 
@@ -26,6 +27,7 @@ export const once = false;
  * - Commands → Command executor
  * - Buttons → Button handler
  * - Select menus → Select handler
+ * - Modals → Modal handler
  *
  * @param {Client} client - The Discord client instance
  * @param {Interaction} interaction - The interaction that was created
@@ -41,7 +43,6 @@ export async function execute(client, interaction) {
       return;
     }
 
-    // Log command execution for debug purposes
     logger.command(interaction.commandName, interaction.user.id);
 
     try {
@@ -63,5 +64,11 @@ export async function execute(client, interaction) {
   // Handle all select menu types (user, string, role, channel, mentionable)
   if (interaction.isAnySelectMenu()) {
     await handleSelect(interaction);
+  }
+
+  // Handle modal submissions (trade details, etc.)
+  if (interaction.isModalSubmit()) {
+    logger.modal(interaction.customId, interaction.user.id);
+    await handleModal(interaction);
   }
 }

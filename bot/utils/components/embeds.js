@@ -66,3 +66,15 @@ export function buildTradeEmbed() {
       iconURL: ASSETS.LOGO_URL,
     });
 }
+
+export function buildSubmitTradeDetailsEmbed() {
+  return new EmbedBuilder()
+    .setColor(COLORS.VERIFIED_GREEN)
+    .setTitle('Submit Trade Details')
+    .setDescription('Please click the button below to continue.')
+    .setThumbnail(ASSETS.LOGO_URL)
+    .setFooter({
+      text: 'amis.',
+      iconURL: ASSETS.LOGO_URL,
+    });
+}

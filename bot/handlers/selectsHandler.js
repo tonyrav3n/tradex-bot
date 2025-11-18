@@ -10,7 +10,8 @@
 
 import { MessageFlags } from 'discord.js';
 
-import { buildTradeDetailsModal } from '../utils/components/modals.js';
+import { buildTradeDetailsButtonRow } from '../utils/components/buttons.js';
+import { buildSubmitTradeDetailsEmbed } from '../utils/components/embeds.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -98,29 +99,15 @@ async function handleCounterpartySelect(interaction, role) {
     });
   }
 
-  // All validations passed - show the trade details modal
-  logger.debug('Showing trade details modal:', { role, selectedUserId });
+  // All validations passed - show trade setup completion screen
+  logger.debug('Counterparty validated, showing trade setup completion:', {
+    role,
+    selectedUserId,
+  });
 
-  try {
-    const modal = buildTradeDetailsModal(role, selectedUserId);
-    await interaction.showModal(modal);
-    logger.success('Modal shown successfully');
-  } catch (error) {
-    logger.error('Error showing modal:', error);
-    logger.debug('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-    });
-
-    // Try to respond to the user
-    try {
-      await interaction.reply({
-        content: '⚠️ Failed to open trade details form. Please try again.',
-        flags: MessageFlags.Ephemeral,
-      });
-    } catch (replyError) {
-      logger.error('Failed to send error message:', replyError);
-    }
-  }
+  await interaction.update({
+    content: '',
+    embeds: [buildSubmitTradeDetailsEmbed()],
+    components: [buildTradeDetailsButtonRow(role, selectedUserId)],
+  });
 }

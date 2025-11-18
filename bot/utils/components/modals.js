@@ -22,7 +22,6 @@ import {
  * await interaction.showModal(modal);
  */
 export function buildTradeDetailsModal(role, selectedUserId) {
-  // Item input field - what is being traded
   const itemInput = new TextInputBuilder()
     .setCustomId('item_input')
     .setLabel('What are you trading?')

@@ -34,13 +34,11 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
  */
 client.commands = new Collection();
 
-// Load all commands from /commands directory
 const commandsDir = path.join(process.cwd(), 'bot', 'commands');
 const commandFiles = fs
   .readdirSync(commandsDir)
   .filter((f) => f.endsWith('.js'));
 
-// Import and register each command
 for (const file of commandFiles) {
   const mod = await import(`./commands/${file}`);
 
@@ -54,10 +52,8 @@ for (const file of commandFiles) {
   client.commands.set(name, mod);
 }
 
-// Load all events from /events directory
 const eventDir = path.join(process.cwd(), 'bot', 'events');
 const eventFiles = fs.readdirSync(eventDir).filter((f) => f.endsWith('.js'));
-// Import and register each event handler
 for (const file of eventFiles) {
   const mod = await import(`./events/${file}`);
 
@@ -74,5 +70,4 @@ for (const file of eventFiles) {
   }
 }
 
-// Connect to Discord using bot token
 client.login(env.TOKEN);

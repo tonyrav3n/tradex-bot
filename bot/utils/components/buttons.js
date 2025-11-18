@@ -67,19 +67,20 @@ export function buildRoleButtonsRow() {
   );
 }
 
-/**
- * Build a back button to return to role selection
- *
- * Creates a secondary button that navigates back to the role selection step
- * from the counterparty selection screen.
- *
- * @returns {ActionRowBuilder} Action row containing the back button
- *
- * @example
- * const backButton = buildCounterpartyBackButton();
- * await interaction.update({ components: [selectMenu, backButton] });
- */
-export function buildCounterpartyBackButton() {
+export function buildTradeDetailsButtonRow(role, selectedUserId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`trade_details_btn:${role}:${selectedUserId}`)
+      .setLabel('📝 Continue')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`back_btn:counterparty:${role}`)
+      .setLabel('⬅️ Back')
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
+export function buildCounterpartySelectBackButton() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`back_btn:role`)
